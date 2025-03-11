@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    // Target ES6 for modern browser compatibility
-    "target": "es6",
+    // Target ES2020 for modern browser compatibility
+    "target": "ES2020",
     // Use CommonJS modules for Node.js compatibility
     "module": "commonjs",
     // Output compiled files to dist directory
