@@ -10,10 +10,3 @@ services:
     environment:
       - NODE_ENV=production
 
-  # Tests Service - We have this folder so we can enable it
-  tests:
-    build:
-      context: ./tests
-      dockerfile: Dockerfile_new
-    depends_on:
-      - frontend
