@@ -11,66 +11,108 @@ ENV PATH="/home/appuser/.npm-global/bin:${PATH}"
 USER appuser
 WORKDIR /home/appuser/app
 
-# Create necessary directories and files for initial setup
+# Create necessary directories
 RUN mkdir -p src/styles dist && \
-    mkdir -p /home/appuser/.npm-global && \
-    echo "console.log('Server running on port 3000');" > src/server.ts && \
-    printf "@tailwind base;\n@tailwind components;\n@tailwind utilities;\n" > src/styles/input.css
+    mkdir -p /home/appuser/.npm-global
 
-# Create tsconfig.json
-RUN echo '{\
-    "compilerOptions": {\
-        "target": "es6",\
-        "module": "commonjs",\
-        "outDir": "./dist",\
-        "strict": true,\
-        "esModuleInterop": true,\
-        "skipLibCheck": true,\
-        "forceConsistentCasingInFileNames": true\
-    },\
-    "include": ["src/**/*"]\
-}' > tsconfig.json
+# Copy configuration files first (for better layer caching)
+COPY --chown=appuser:appgroup package.json .
+COPY --chown=appuser:appgroup tailwind.config.js .
+COPY --chown=appuser:appgroup tsconfig.json .
 
-# Create tailwind.config.js
-RUN echo 'module.exports = {\
-    content: ["./src/**/*.{html,ts}"],\
-    theme: { extend: {} },\
-    plugins: []\
-}' > tailwind.config.js
+# Install dependencies (including @types/node)
+RUN npm install && \
+    npm install --save-dev @types/node
 
-# Initialize package.json first with specific values
-RUN echo '{\
-  "name": "frontend",\
-  "version": "1.0.0",\
-  "description": "Frontend for ft_transcendence",\
-  "main": "server.js",\
-  "scripts": {\
-    "build:ts": "tsc",\
-    "build:css": "tailwindcss -i ./src/styles/input.css -o ./dist/styles.css",\
-    "build": "npm run build:ts && npm run build:css",\
-    "start": "node dist/server.js"\
-  },\
-  "dependencies": {},\
-  "devDependencies": {}\
-}' > package.json
+# Create initial input.css and index.html
+RUN printf "@tailwind base;\n@tailwind components;\n@tailwind utilities;\n" > src/styles/input.css && \
+    printf '<!DOCTYPE html>\n\
+<html lang="en">\n\
+<head>\n\
+    <meta charset="UTF-8">\n\
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n\
+    <title>42 Transcendence</title>\n\
+    <link href="styles.css" rel="stylesheet">\n\
+</head>\n\
+<body class="bg-gradient-to-r from-blue-500 to-purple-600 min-h-screen">\n\
+    <div class="container mx-auto px-4 py-8">\n\
+        <div class="bg-white rounded-lg shadow-xl p-8 max-w-2xl mx-auto mt-10">\n\
+            <h1 class="text-4xl font-bold text-center mb-6 text-gray-800">42 Transcendence</h1>\n\
+            <p class="text-lg text-gray-600 text-center mb-4">Welcome to the game</p>\n\
+            <div class="flex justify-center space-x-4">\n\
+                <button class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-200">\n\
+                    Play Game\n\
+                </button>\n\
+                <button class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded transition duration-200">\n\
+                    Profile\n\
+                </button>\n\
+            </div>\n\
+        </div>\n\
+    </div>\n\
+</body>\n\
+</html>' > src/index.html
 
-# Install dependencies one at a time and verify each
-RUN npm install typescript --save-dev && \
-    echo "TypeScript version:" && \
-    npx tsc --version
+# Create server.ts with proper type definitions and correct file paths
+RUN printf 'import { createServer, IncomingMessage, ServerResponse } from "http";\n\
+import { readFile } from "fs";\n\
+import { extname, join } from "path";\n\
+\n\
+const DIST_DIR = "./dist";\n\
+\n\
+const server = createServer((req: IncomingMessage, res: ServerResponse) => {\n\
+    // Get the URL path or default to index.html\n\
+    const urlPath = req.url === "/" ? "/index.html" : req.url;\n\
+\n\
+    // Ensure urlPath is defined\n\
+    if (!urlPath) {\n\
+        res.writeHead(404);\n\
+        res.end("404 Not Found");\n\
+        return;\n\
+    }\n\
+\n\
+    // Create the full file path\n\
+    const filePath = join(DIST_DIR, urlPath);\n\
+    const ext = extname(filePath);\n\
+\n\
+    // Set content type based on file extension\n\
+    let contentType = "text/html";\n\
+    switch (ext) {\n\
+        case ".css": contentType = "text/css"; break;\n\
+        case ".js": contentType = "text/javascript"; break;\n\
+        case ".json": contentType = "application/json"; break;\n\
+        case ".png": contentType = "image/png"; break;\n\
+        case ".jpg": contentType = "image/jpg"; break;\n\
+        case ".svg": contentType = "image/svg+xml"; break;\n\
+    }\n\
+\n\
+    // Read and serve the file\n\
+    readFile(filePath, (error: NodeJS.ErrnoException | null, content: Buffer) => {\n\
+        if (error) {\n\
+            if(error.code === "ENOENT") {\n\
+                console.error(`File not found: ${filePath}`);\n\
+                res.writeHead(404);\n\
+                res.end(`404 Not Found: ${urlPath}`);\n\
+            } else {\n\
+                console.error(`Server error: ${error.code}`);\n\
+                res.writeHead(500);\n\
+                res.end(`500 Internal Server Error: ${error.message}`);\n\
+            }\n\
+        } else {\n\
+            res.writeHead(200, { "Content-Type": contentType });\n\
+            res.end(content, "utf-8");\n\
+            console.log(`Served: ${filePath} (${contentType}`);\n\
+        }\n\
+    });\n\
+});\n\
+\n\
+const PORT = 3000;\n\
+server.listen(PORT, () => {\n\
+    console.log(`Server running at http://localhost:${PORT}`);\n\
+    console.log(`Serving files from: ${DIST_DIR}`);\n\
+});\n' > src/server.ts
 
-# Install Tailwind v3.4.1 with its peer dependencies
-RUN npm install tailwindcss@3.4.1 postcss autoprefixer --save-dev && \
-    echo "=== Installed Tailwind Version ===" && \
-    npm ls tailwindcss && \
-    echo "=== Verify Tailwind CLI ===" && \
-    npx tailwindcss --help
-
-# Build TypeScript first
-RUN npm run build:ts
-
-# Then build Tailwind
-RUN npm run build:css
+# Build the application
+RUN npm run build
 
 # Production stage
 FROM node:20-alpine
@@ -80,19 +122,15 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 WORKDIR /home/appuser/app
 
-# Copy built assets
+# Copy built assets and configuration
 COPY --from=builder /home/appuser/app/dist ./dist
+COPY --from=builder /home/appuser/app/package.json .
+
+# Install only production dependencies
+RUN npm install --production
 
 # Expose port
 EXPOSE 3000
 
-# Create a simple server.js file
-RUN echo 'const http = require("http");\
-const server = http.createServer((req, res) => {\
-    res.writeHead(200, {"Content-Type": "text/html"});\
-    res.end("<h1>Frontend Server Running</h1>");\
-});\
-server.listen(3000, () => console.log("Server running on port 3000"));' > dist/server.js
-
 # Start server
-CMD ["node", "dist/server.js"]
+CMD ["npm", "start"]
