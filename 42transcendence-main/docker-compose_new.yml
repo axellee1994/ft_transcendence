@@ -1,12 +1,18 @@
 services:
-  # Frontend Service - We have this folder so we can enable it
+  # Frontend Service Configuration
   frontend:
     build: 
       context: ./frontend
+      # Use new Dockerfile that supports rootless mode and security requirements
       dockerfile: Dockerfile_new
     ports:
+      # Dynamic port mapping with fallback to 3000
+      # FRONTEND_PORT can be changed without modifying this file
       - "${FRONTEND_PORT:-3000}:3000"
+    # Ensure container restarts unless explicitly stopped
+    # This improves reliability in production
     restart: unless-stopped
     environment:
+      # Production mode for better performance and security
       - NODE_ENV=production
 

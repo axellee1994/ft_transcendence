@@ -1,30 +1,41 @@
+# Use Node.js Alpine as base image for smaller size
 FROM node:20-alpine AS builder
 
-# Create non-root user for security
+# Create non-root user for security (required for rootless mode)
+# This is mandatory as per subject requirements for security
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Set npm global directory to user's home
+# Configure npm to work with non-root user
+# This ensures npm can install packages without root privileges
 ENV NPM_CONFIG_PREFIX=/home/appuser/.npm-global
 ENV PATH="/home/appuser/.npm-global/bin:${PATH}"
 
-# Switch to non-root user
+# Switch to non-root user for security
+# All subsequent commands will run as non-root
 USER appuser
 WORKDIR /home/appuser/app
 
-# Create necessary directories
+# Create required directories
+# src/styles: for Tailwind CSS
+# dist: for compiled output
 RUN mkdir -p src/styles dist && \
     mkdir -p /home/appuser/.npm-global
 
-# Copy configuration files first (for better layer caching)
+# Copy configuration files with proper ownership
+# Using --chown ensures files are owned by non-root user
+# These files are copied first for better layer caching
 COPY --chown=appuser:appgroup package.json .
 COPY --chown=appuser:appgroup tailwind.config.js .
 COPY --chown=appuser:appgroup tsconfig.json .
 
-# Install dependencies (including @types/node)
+# Install dependencies including TypeScript types
+# @types/node is required for TypeScript Node.js definitions
 RUN npm install && \
     npm install --save-dev @types/node
 
-# Create initial input.css and index.html
+# Create initial files with proper configuration
+# input.css: Required for Tailwind CSS
+# index.html: Single page application entry point
 RUN printf "@tailwind base;\n@tailwind components;\n@tailwind utilities;\n" > src/styles/input.css && \
     printf '<!DOCTYPE html>\n\
 <html lang="en">\n\
@@ -52,7 +63,12 @@ RUN printf "@tailwind base;\n@tailwind components;\n@tailwind utilities;\n" > sr
 </body>\n\
 </html>' > src/index.html
 
-# Create server.ts with proper type definitions and correct file paths
+# Create TypeScript server file
+# This implements a basic HTTP server that:
+# - Serves static files from dist directory
+# - Handles SPA routing
+# - Provides proper content types
+# - Implements error handling
 RUN printf 'import { createServer, IncomingMessage, ServerResponse } from "http";\n\
 import { readFile } from "fs";\n\
 import { extname, join } from "path";\n\
@@ -111,26 +127,27 @@ server.listen(PORT, () => {\n\
     console.log(`Serving files from: ${DIST_DIR}`);\n\
 });\n' > src/server.ts
 
-# Build the application
+# Build the application for production
 RUN npm run build
 
-# Production stage
+# Start fresh for production image
 FROM node:20-alpine
 
-# Create non-root user
+# Set up non-root user in production
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 WORKDIR /home/appuser/app
 
-# Copy built assets and configuration
+# Copy only necessary files from builder
+# This reduces final image size
 COPY --from=builder /home/appuser/app/dist ./dist
 COPY --from=builder /home/appuser/app/package.json .
 
 # Install only production dependencies
 RUN npm install --production
 
-# Expose port
+# Expose port for access
 EXPOSE 3000
 
-# Start server
+# Start production server
 CMD ["npm", "start"]

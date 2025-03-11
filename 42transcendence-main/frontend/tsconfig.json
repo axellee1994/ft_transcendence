@@ -1,12 +1,20 @@
 {
   "compilerOptions": {
+    // Target ES6 for modern browser compatibility
     "target": "es6",
+    // Use CommonJS modules for Node.js compatibility
     "module": "commonjs",
+    // Output compiled files to dist directory
     "outDir": "./dist",
+    // Enable strict type checking for better reliability
     "strict": true,
+    // Allow default imports from modules
     "esModuleInterop": true,
+    // Skip type checking of declaration files
     "skipLibCheck": true,
+    // Ensure consistent casing in file names
     "forceConsistentCasingInFileNames": true
   },
+  // Include all TypeScript files in src directory
   "include": ["src/**/*"]
 } 
