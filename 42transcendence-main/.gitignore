@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+dist/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Database
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+npm-debug.log*
+
+# System
+.DS_Store
+
+# SSL
+*.pem
+*.key
+*.crt

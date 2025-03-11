@@ -1,0 +1,98 @@
+FROM node:20-alpine AS builder
+
+# Create non-root user for security
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Set npm global directory to user's home
+ENV NPM_CONFIG_PREFIX=/home/appuser/.npm-global
+ENV PATH="/home/appuser/.npm-global/bin:${PATH}"
+
+# Switch to non-root user
+USER appuser
+WORKDIR /home/appuser/app
+
+# Create necessary directories and files for initial setup
+RUN mkdir -p src/styles dist && \
+    mkdir -p /home/appuser/.npm-global && \
+    echo "console.log('Server running on port 3000');" > src/server.ts && \
+    printf "@tailwind base;\n@tailwind components;\n@tailwind utilities;\n" > src/styles/input.css
+
+# Create tsconfig.json
+RUN echo '{\
+    "compilerOptions": {\
+        "target": "es6",\
+        "module": "commonjs",\
+        "outDir": "./dist",\
+        "strict": true,\
+        "esModuleInterop": true,\
+        "skipLibCheck": true,\
+        "forceConsistentCasingInFileNames": true\
+    },\
+    "include": ["src/**/*"]\
+}' > tsconfig.json
+
+# Create tailwind.config.js
+RUN echo 'module.exports = {\
+    content: ["./src/**/*.{html,ts}"],\
+    theme: { extend: {} },\
+    plugins: []\
+}' > tailwind.config.js
+
+# Initialize package.json first with specific values
+RUN echo '{\
+  "name": "frontend",\
+  "version": "1.0.0",\
+  "description": "Frontend for ft_transcendence",\
+  "main": "server.js",\
+  "scripts": {\
+    "build:ts": "tsc",\
+    "build:css": "tailwindcss -i ./src/styles/input.css -o ./dist/styles.css",\
+    "build": "npm run build:ts && npm run build:css",\
+    "start": "node dist/server.js"\
+  },\
+  "dependencies": {},\
+  "devDependencies": {}\
+}' > package.json
+
+# Install dependencies one at a time and verify each
+RUN npm install typescript --save-dev && \
+    echo "TypeScript version:" && \
+    npx tsc --version
+
+# Install Tailwind v3.4.1 with its peer dependencies
+RUN npm install tailwindcss@3.4.1 postcss autoprefixer --save-dev && \
+    echo "=== Installed Tailwind Version ===" && \
+    npm ls tailwindcss && \
+    echo "=== Verify Tailwind CLI ===" && \
+    npx tailwindcss --help
+
+# Build TypeScript first
+RUN npm run build:ts
+
+# Then build Tailwind
+RUN npm run build:css
+
+# Production stage
+FROM node:20-alpine
+
+# Create non-root user
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+WORKDIR /home/appuser/app
+
+# Copy built assets
+COPY --from=builder /home/appuser/app/dist ./dist
+
+# Expose port
+EXPOSE 3000
+
+# Create a simple server.js file
+RUN echo 'const http = require("http");\
+const server = http.createServer((req, res) => {\
+    res.writeHead(200, {"Content-Type": "text/html"});\
+    res.end("<h1>Frontend Server Running</h1>");\
+});\
+server.listen(3000, () => console.log("Server running on port 3000"));' > dist/server.js
+
+# Start server
+CMD ["node", "dist/server.js"]
