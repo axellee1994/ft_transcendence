@@ -5,6 +5,7 @@ services:
       context: ./frontend
       # Use new Dockerfile that supports rootless mode and security requirements
       dockerfile: Dockerfile_new
+      no_cache: true
     ports:
       # Dynamic port mapping with fallback to 3000
       # FRONTEND_PORT can be changed without modifying this file
