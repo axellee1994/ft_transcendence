@@ -122,8 +122,8 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {\n\
 });\n\
 \n\
 const PORT = 3000;\n\
-server.listen(PORT, () => {\n\
-    console.log(`Server running at http://localhost:${PORT}`);\n\
+server.listen(PORT,"0.0.0.0", () => {\n\
+    console.log(`Server running at http://0.0.0.0:${PORT}`);\n\
     console.log(`Serving files from: ${DIST_DIR}`);\n\
 });\n' > src/server.ts
 
