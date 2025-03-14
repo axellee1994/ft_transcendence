@@ -1,9 +1,8 @@
-// Create a simple 3D scene without using Babylon.js
+// Using globally loaded Babylon.js
 export class BabylonScene {
     private canvas: HTMLCanvasElement;
-    private ctx: CanvasRenderingContext2D | null;
-    private cube: Cube;
-    private animationId: number | null = null;
+    private engine: BABYLON.Engine;
+    private scene: BABYLON.Scene;
 
     constructor(canvasId: string) {
         // Get the canvas element
@@ -12,92 +11,54 @@ export class BabylonScene {
             throw new Error(`Canvas element with id '${canvasId}' not found or is not a canvas element`);
         }
         this.canvas = canvas;
-        this.ctx = this.canvas.getContext('2d');
+
+        // Initialize the engine and scene
+        this.engine = new BABYLON.Engine(this.canvas, true, { preserveDrawingBuffer: true, stencil: true });
+        this.scene = new BABYLON.Scene(this.engine);
         
-        if (!this.ctx) {
-            throw new Error('Could not get 2D context from canvas');
-        }
+        // Set background color to light gray
+        this.scene.clearColor = new BABYLON.Color4(0.9, 0.9, 0.9, 1);
         
-        // Create a simple cube
-        this.cube = new Cube(100, '#0000FF');
+        this.createScene();
         
         // Start the render loop
-        this.startAnimation();
-        
-        console.log("Scene created successfully");
+        this.engine.runRenderLoop(() => {
+            this.scene.render();
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            this.engine.resize();
+        });
     }
 
-    private startAnimation(): void {
-        let rotation = 0;
-        
-        const animate = () => {
-            if (!this.ctx) return;
-            
-            // Clear canvas
-            this.ctx.fillStyle = '#f0f0f0';
-            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-            
-            // Update rotation
-            rotation += 0.01;
-            
-            // Draw cube
-            this.cube.draw(this.ctx, this.canvas.width / 2, this.canvas.height / 2, rotation);
-            
-            // Continue animation
-            this.animationId = requestAnimationFrame(animate);
-        };
-        
-        animate();
-    }
-}
+    private createScene(): void {
+        try {
+            // Create camera
+            const camera = new BABYLON.ArcRotateCamera("camera", 0, Math.PI / 3, 10, BABYLON.Vector3.Zero(), this.scene);
+            camera.attachControl(this.canvas, true);
+            camera.setPosition(new BABYLON.Vector3(0, 5, -10));
 
-// Simple cube class
-class Cube {
-    private size: number;
-    private color: string;
-    
-    constructor(size: number, color: string) {
-        this.size = size;
-        this.color = color;
-    }
-    
-    draw(ctx: CanvasRenderingContext2D, centerX: number, centerY: number, rotation: number): void {
-        const halfSize = this.size / 2;
-        
-        // Save context
-        ctx.save();
-        
-        // Translate to center
-        ctx.translate(centerX, centerY);
-        
-        // Rotate
-        ctx.rotate(rotation);
-        
-        // Draw a simple square (front face of cube)
-        ctx.fillStyle = this.color;
-        ctx.fillRect(-halfSize, -halfSize, this.size, this.size);
-        
-        // Add some 3D effect with a darker side
-        ctx.fillStyle = '#0000AA'; // Darker blue
-        ctx.beginPath();
-        ctx.moveTo(halfSize, -halfSize);
-        ctx.lineTo(halfSize + 20, -halfSize + 20);
-        ctx.lineTo(halfSize + 20, halfSize + 20);
-        ctx.lineTo(halfSize, halfSize);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Add top side
-        ctx.fillStyle = '#0000CC'; // Medium blue
-        ctx.beginPath();
-        ctx.moveTo(-halfSize, -halfSize);
-        ctx.lineTo(-halfSize + 20, -halfSize - 20);
-        ctx.lineTo(halfSize + 20, -halfSize - 20);
-        ctx.lineTo(halfSize, -halfSize);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Restore context
-        ctx.restore();
+            // Create light
+            const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), this.scene);
+            light.intensity = 0.7;
+
+            // Create a blue cube
+            const cube = BABYLON.MeshBuilder.CreateBox("cube", { size: 2 }, this.scene);
+            const material = new BABYLON.StandardMaterial("cubeMaterial", this.scene);
+            material.diffuseColor = new BABYLON.Color3(0, 0, 1); // Blue
+            cube.material = material;
+            cube.position = BABYLON.Vector3.Zero();
+
+            // Add rotation animation
+            this.scene.registerBeforeRender(() => {
+                cube.rotation.y += 0.01;
+                cube.rotation.x += 0.005;
+            });
+
+            console.log("Scene created successfully");
+        } catch (error) {
+            console.error("Error creating scene:", error);
+        }
     }
 }
