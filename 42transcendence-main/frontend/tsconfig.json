@@ -1,20 +1,19 @@
 {
   "compilerOptions": {
-    // Target ES2020 for modern browser compatibility
     "target": "ES2020",
-    // Use CommonJS modules for Node.js compatibility
-    "module": "commonjs",
-    // Output compiled files to dist directory
+    "module": "ES2020",
     "outDir": "./dist",
-    // Enable strict type checking for better reliability
     "strict": true,
-    // Allow default imports from modules
     "esModuleInterop": true,
-    // Skip type checking of declaration files
     "skipLibCheck": true,
-    // Ensure consistent casing in file names
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["ES2020", "DOM"],
+    "moduleResolution": "node",
+    "allowJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "@babylonjs/*": ["node_modules/@babylonjs/*"]
+    }
   },
-  // Include all TypeScript files in src directory
   "include": ["src/**/*"]
-} 
+}

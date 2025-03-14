@@ -1,7 +1,10 @@
+import { BabylonScene } from './components/BabylonScene.js';
+
 // Simple router implementation
 class Router {
     private routes: Map<string, () => void>;
     private root: string;
+    private babylonScene: BabylonScene | null = null;
 
     constructor(root: string = '') {
         this.routes = new Map();
@@ -24,6 +27,18 @@ class Router {
         const callback = this.routes.get(path) || this.routes.get('*');
         callback?.();
     }
+
+    initBabylon(): void {
+        if (!this.babylonScene) {
+            console.log("Initializing Babylon.js scene...");
+            try {
+                this.babylonScene = new BabylonScene('renderCanvas');
+                console.log("Babylon.js scene initialized successfully");
+            } catch (error) {
+                console.error("Failed to initialize Babylon.js scene:", error);
+            }
+        }
+    }
 }
 
 // Initialize router
@@ -31,15 +46,7 @@ const router = new Router();
 
 // Define routes
 router.addRoute('/', () => {
-    const app = document.getElementById('app');
-    if (app) {
-        app.innerHTML = `
-            <div class="text-center">
-                <h1 class="text-4xl font-bold text-gray-900 mb-4">42 Transcendence</h1>
-                <p class="text-gray-600">Welcome to the application!</p>
-            </div>
-        `;
-    }
+    router.initBabylon();
 });
 
 // Handle 404

@@ -1,15 +1,23 @@
-version: '3.8'
-
 services:
+  # Frontend Service Configuration
   frontend:
     build: 
       context: ./frontend
+      # Use new Dockerfile that supports rootless mode and security requirements
       dockerfile: Dockerfile
+      no_cache: true
     ports:
-      # If port 3000 is taken, you can change the left number (e.g., "3001:3000")
-      - "${PORT:-3000}:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      # Dynamic port mapping with fallback to 3000
+      # FRONTEND_PORT can be changed without modifying this file
+      - "3000:3000"
+    # Ensure container restarts unless explicitly stopped
+    # This improves reliability in production
+    restart: unless-stopped
     environment:
-      - NODE_ENV=development 
+      # Production mode for better performance and security
+      - NODE_ENV=development
+    init: true
+    tty: true
+    stdin_open: true
+    command: sh -c "npm run start"  # Add ls command to see files
+

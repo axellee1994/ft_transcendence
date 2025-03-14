@@ -4,19 +4,23 @@
   "description": "42 Transcendence Frontend",
 
   "scripts": {
-    "start": "concurrently \"tsc --watch\" \"npm run copy:html\" \"live-server --host=0.0.0.0 --port=3000 --no-browser dist/\" \"tailwindcss -i ./src/styles/input.css -o ./dist/styles.css --watch\"",
-    
-    "build": "tsc && tailwindcss -i ./src/styles/input.css -o ./dist/styles.css && npm run copy:html",
-    
+    "start": "npm run build && (tsc --watch & npm run serve & npm run watch:css)",
+    "dev": "npm run build && (trap 'kill 0' SIGINT SIGTERM; tsc --watch & npm run serve & npm run watch:css & wait)",
+    "build": "tsc --project ./tsconfig.json",
+    "postbuild": "tailwindcss -i ./src/styles/input.css -o ./dist/styles.css && npm run copy:html",
+    "watch:css": "tailwindcss -i ./src/styles/input.css -o ./dist/styles.css --watch",
+    "serve": "live-server --host=0.0.0.0 --port=3000 --no-browser dist/",
     "copy:html": "cp src/index.html dist/"
   },
 
-  "dependencies": {},
+  "dependencies": {
+    "@babylonjs/core": "6.47.0",
+    "tailwindcss": "^3.4.1",
+    "live-server": "^1.2.2"
+  },
 
   "devDependencies": {
-    "typescript": "^5.3.3",
-    "tailwindcss": "^3.4.1",
-    "live-server": "^1.2.2",
-    "concurrently": "^8.2.2"
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.3"
   }
 }
