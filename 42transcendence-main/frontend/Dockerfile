@@ -23,8 +23,8 @@ COPY --chown=appuser:appgroup tailwind.config.js ./
 
 # Install all dependencies (including dev dependencies)
 RUN npm install && \
-    npm install @babylonjs/core@6.47.0 tailwindcss@3.4.1 live-server && \
-    npm install --save-dev @types/node typescript
+    npm install @babylonjs/core@6.47.0 tailwindcss@3.4.1 express@4.18.2 && \
+    npm install --save-dev @types/node @types/express typescript
 
 # Copy source files
 COPY --chown=appuser:appgroup src ./src
@@ -56,4 +56,4 @@ RUN mkdir -p dist src/styles
 EXPOSE 3000
 
 # Start production server
-CMD ["npx", "live-server", "--host=0.0.0.0", "--port=3000", "--no-browser", "dist/"]
+CMD ["node", "dist/server.js"]
