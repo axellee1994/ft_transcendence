@@ -124,7 +124,6 @@ async function tournamentRoutes(fastify, options) {
       const { id } = request.params;
       const { name, description, start_date, end_date, status } = request.body;
       
-      console.log("Received update request for tournament ID", id)
 
       // Check if tournament exists
       const tournament = await fastify.db.get('SELECT id FROM tournaments WHERE id = ?', [id]);
