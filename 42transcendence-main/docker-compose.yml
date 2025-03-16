@@ -16,8 +16,28 @@ services:
     environment:
       # Production mode for better performance and security
       - NODE_ENV=development
+      - API_URL=http://backend:3001
     init: true
     tty: true
     stdin_open: true
     command: sh -c "npm run start"  # Add ls command to see files
+    depends_on:
+      - backend
+
+  # Backend Service Configuration
+  backend:
+    build:
+      context: ./backend/srcs
+      dockerfile: Dockerfile
+      no_cache: true
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./backend/data:/usr/src/app/data
+    init: true
+    tty: true
+    stdin_open: true
 
