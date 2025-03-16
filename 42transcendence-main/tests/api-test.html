@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h2 {
+            margin-top: 0;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>API Test Page</h1>
+    
+    <div class="test-section">
+        <h2>Health Check</h2>
+        <button id="test-health">Test Health Endpoint</button>
+        <pre id="health-result"></pre>
+    </div>
+    
+    <div class="test-section">
+        <h2>Users</h2>
+        <button id="get-users">Get All Users</button>
+        <button id="create-user">Create Test User</button>
+        <pre id="users-result"></pre>
+    </div>
+    
+    <div class="test-section">
+        <h2>Games</h2>
+        <button id="get-games">Get All Games</button>
+        <button id="create-game">Create Test Game</button>
+        <pre id="games-result"></pre>
+    </div>
+    
+    <div class="test-section">
+        <h2>Tournaments</h2>
+        <button id="get-tournaments">Get All Tournaments</button>
+        <button id="create-tournament">Create Test Tournament</button>
+        <pre id="tournaments-result"></pre>
+    </div>
+    
+    <script>
+        const API_URL = 'http://localhost:3001';
+        
+        // Health Check
+        document.getElementById('test-health').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                document.getElementById('health-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('health-result').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Users
+        document.getElementById('get-users').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/users`);
+                const data = await response.json();
+                document.getElementById('users-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('users-result').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        document.getElementById('create-user').addEventListener('click', async () => {
+            try {
+                const username = `testuser_${Date.now()}`;
+                const response = await fetch(`${API_URL}/api/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username,
+                        display_name: 'Test User'
+                    })
+                });
+                const data = await response.json();
+                document.getElementById('users-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('users-result').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Games
+        document.getElementById('get-games').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/games`);
+                const data = await response.json();
+                document.getElementById('games-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('games-result').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        document.getElementById('create-game').addEventListener('click', async () => {
+            try {
+                // First, get users to use as players
+                const usersResponse = await fetch(`${API_URL}/api/users`);
+                const users = await usersResponse.json();
+                
+                if (users.length < 2) {
+                    document.getElementById('games-result').textContent = 'Error: Need at least 2 users to create a game';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/games`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        player1_id: users[0].id,
+                        player2_id: users[1].id
+                    })
+                });
+                const data = await response.json();
+                document.getElementById('games-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('games-result').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Tournaments
+        document.getElementById('get-tournaments').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/tournaments`);
+                const data = await response.json();
+                document.getElementById('tournaments-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('tournaments-result').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        document.getElementById('create-tournament').addEventListener('click', async () => {
+            try {
+                const name = `Tournament ${Date.now()}`;
+                const response = await fetch(`${API_URL}/api/tournaments`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name,
+                        description: 'Test tournament',
+                        start_date: '2025-04-01',
+                        end_date: '2025-04-02'
+                    })
+                });
+                const data = await response.json();
+                document.getElementById('tournaments-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('tournaments-result').textContent = `Error: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html> 

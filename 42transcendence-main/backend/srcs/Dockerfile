@@ -4,11 +4,17 @@ FROM node:20-alpine
 WORKDIR /usr/src/app
 
 # Install app dependencies
-COPY package*.json ./
+COPY backend/srcs/package*.json ./
 RUN npm install
 
 # Bundle app source
-COPY . .
+COPY backend/srcs/ .
+
+# Copy test files
+COPY tests/ ./tests/
+
+# Create data directory
+RUN mkdir -p data
 
 # Expose API port
 EXPOSE 3001

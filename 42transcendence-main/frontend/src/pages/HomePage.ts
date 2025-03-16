@@ -1,3 +1,5 @@
+import { api } from '../services/api.js';
+
 /**
  * Renders the Home page
  */
@@ -43,6 +45,53 @@ export function renderHomePage(contentElement: HTMLElement): void {
                     Play Pong Now
                 </a>
             </div>
+            
+            <div id="api-test-results" class="mt-8 p-4 bg-gray-100 rounded-lg hidden">
+                <h3 class="text-xl font-bold text-gray-800 mb-2">API Connection Test</h3>
+                <pre id="api-test-output" class="bg-gray-800 text-green-400 p-4 rounded overflow-auto max-h-60"></pre>
+            </div>
         </div>
     `;
+    
+    // Test API connection
+    testApiConnection();
+    
+    async function testApiConnection() {
+        const outputElement = document.getElementById('api-test-output');
+        const resultsContainer = document.getElementById('api-test-results');
+        
+        if (!outputElement || !resultsContainer) return;
+        
+        // Show the results container
+        resultsContainer.classList.remove('hidden');
+        
+        try {
+            // Test health endpoint
+            outputElement.textContent = 'Testing API connection...\n';
+            const health = await api.getHealth();
+            outputElement.textContent += `Health check: ${JSON.stringify(health)}\n\n`;
+            
+            // Test users endpoint
+            outputElement.textContent += 'Fetching users...\n';
+            const users = await api.getUsers();
+            outputElement.textContent += `Users: ${JSON.stringify(users, null, 2)}\n\n`;
+            
+            // Test tournaments endpoint
+            outputElement.textContent += 'Fetching tournaments...\n';
+            const tournaments = await api.getTournaments();
+            outputElement.textContent += `Tournaments: ${JSON.stringify(tournaments, null, 2)}\n\n`;
+            
+            // Test games endpoint
+            outputElement.textContent += 'Fetching games...\n';
+            const games = await api.getGames();
+            outputElement.textContent += `Games: ${JSON.stringify(games, null, 2)}\n\n`;
+            
+            outputElement.textContent += 'API connection test completed successfully!';
+        } catch (error) {
+            console.error('API connection test failed:', error);
+            outputElement.textContent += `\nError: ${error instanceof Error ? error.message : String(error)}`;
+            outputElement.classList.remove('text-green-400');
+            outputElement.classList.add('text-red-400');
+        }
+    }
 } 

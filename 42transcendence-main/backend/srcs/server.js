@@ -10,14 +10,15 @@ const fastify = require('fastify')({
   }
 });
 
+// Register CORS plugin
+fastify.register(require('@fastify/cors'), {
+  origin: '*', // In production, you should restrict this to your frontend domain
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+});
+
 // Register plugins
 async function registerPlugins() {
-  // CORS to allow frontend to communicate with backend
-  await fastify.register(require('@fastify/cors'), {
-    origin: true, // Allow all origins in development
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-  });
-
   // WebSocket for real-time game communication
   await fastify.register(require('@fastify/websocket'), {
     options: { maxPayload: 1048576 } // 1MB max payload

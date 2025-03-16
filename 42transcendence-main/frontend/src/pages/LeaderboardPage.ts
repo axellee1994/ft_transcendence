@@ -1,7 +1,10 @@
+import { api, User } from '../services/api.js';
+
 /**
  * Renders the Leaderboard page
  */
 export function renderLeaderboardPage(contentElement: HTMLElement): void {
+    // Initial render with loading state
     contentElement.innerHTML = `
         <div class="bg-white rounded-lg shadow-xl p-8 max-w-4xl mx-auto mt-10">
             <h1 class="text-4xl font-bold text-center mb-6 text-gray-800">Leaderboard</h1>
@@ -36,96 +39,17 @@ export function renderLeaderboardPage(contentElement: HTMLElement): void {
                             <th class="px-4 py-3 rounded-tr-lg">Points</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr class="border-b border-gray-200 bg-yellow-50">
-                            <td class="px-4 py-3 font-bold">1</td>
-                            <td class="px-4 py-3">
-                                <div class="flex items-center">
-                                    <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
-                                        <span class="text-sm font-bold text-white">JD</span>
-                                    </div>
-                                    <div>
-                                        <div class="font-medium">John Doe</div>
-                                        <div class="text-xs text-gray-500">@johndoe</div>
-                                    </div>
+                    <tbody id="leaderboard-body">
+                        <tr>
+                            <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                                <div class="flex justify-center items-center">
+                                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Loading players...
                                 </div>
                             </td>
-                            <td class="px-4 py-3 text-green-600 font-medium">42</td>
-                            <td class="px-4 py-3 text-red-600 font-medium">18</td>
-                            <td class="px-4 py-3 font-medium">70%</td>
-                            <td class="px-4 py-3 font-bold">1250</td>
-                        </tr>
-                        <tr class="border-b border-gray-200 bg-gray-50">
-                            <td class="px-4 py-3 font-bold">2</td>
-                            <td class="px-4 py-3">
-                                <div class="flex items-center">
-                                    <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mr-3">
-                                        <span class="text-sm font-bold text-white">JS</span>
-                                    </div>
-                                    <div>
-                                        <div class="font-medium">Jane Smith</div>
-                                        <div class="text-xs text-gray-500">@janesmith</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3 text-green-600 font-medium">38</td>
-                            <td class="px-4 py-3 text-red-600 font-medium">15</td>
-                            <td class="px-4 py-3 font-medium">72%</td>
-                            <td class="px-4 py-3 font-bold">1180</td>
-                        </tr>
-                        <tr class="border-b border-gray-200">
-                            <td class="px-4 py-3 font-bold">3</td>
-                            <td class="px-4 py-3">
-                                <div class="flex items-center">
-                                    <div class="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center mr-3">
-                                        <span class="text-sm font-bold text-white">RJ</span>
-                                    </div>
-                                    <div>
-                                        <div class="font-medium">Robert Johnson</div>
-                                        <div class="text-xs text-gray-500">@robertj</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3 text-green-600 font-medium">35</td>
-                            <td class="px-4 py-3 text-red-600 font-medium">20</td>
-                            <td class="px-4 py-3 font-medium">64%</td>
-                            <td class="px-4 py-3 font-bold">1050</td>
-                        </tr>
-                        <tr class="border-b border-gray-200">
-                            <td class="px-4 py-3 font-bold">4</td>
-                            <td class="px-4 py-3">
-                                <div class="flex items-center">
-                                    <div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center mr-3">
-                                        <span class="text-sm font-bold text-white">EW</span>
-                                    </div>
-                                    <div>
-                                        <div class="font-medium">Emily Wilson</div>
-                                        <div class="text-xs text-gray-500">@emilyw</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3 text-green-600 font-medium">30</td>
-                            <td class="px-4 py-3 text-red-600 font-medium">22</td>
-                            <td class="px-4 py-3 font-medium">58%</td>
-                            <td class="px-4 py-3 font-bold">980</td>
-                        </tr>
-                        <tr class="border-b border-gray-200">
-                            <td class="px-4 py-3 font-bold">5</td>
-                            <td class="px-4 py-3">
-                                <div class="flex items-center">
-                                    <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center mr-3">
-                                        <span class="text-sm font-bold text-white">MB</span>
-                                    </div>
-                                    <div>
-                                        <div class="font-medium">Michael Brown</div>
-                                        <div class="text-xs text-gray-500">@michaelb</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3 text-green-600 font-medium">28</td>
-                            <td class="px-4 py-3 text-red-600 font-medium">25</td>
-                            <td class="px-4 py-3 font-medium">53%</td>
-                            <td class="px-4 py-3 font-bold">920</td>
                         </tr>
                     </tbody>
                 </table>
@@ -134,7 +58,7 @@ export function renderLeaderboardPage(contentElement: HTMLElement): void {
             <!-- Pagination -->
             <div class="flex justify-between items-center mt-6">
                 <div class="text-sm text-gray-600">
-                    Showing <span class="font-medium">1</span> to <span class="font-medium">5</span> of <span class="font-medium">24</span> players
+                    <span id="pagination-info">Loading...</span>
                 </div>
                 <div class="flex space-x-1">
                     <button class="px-3 py-1 bg-gray-200 text-gray-600 rounded-md hover:bg-gray-300 transition" disabled>Previous</button>
@@ -146,4 +70,95 @@ export function renderLeaderboardPage(contentElement: HTMLElement): void {
             </div>
         </div>
     `;
+
+    // Fetch users from API
+    fetchUsers();
+
+    async function fetchUsers() {
+        try {
+            const users = await api.getUsers();
+            renderLeaderboard(users);
+        } catch (error) {
+            console.error('Error fetching users:', error);
+            const leaderboardBody = document.getElementById('leaderboard-body');
+            if (leaderboardBody) {
+                leaderboardBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-red-500">
+                            Failed to load leaderboard data. Please try again later.
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+    }
+
+    function renderLeaderboard(users: User[]) {
+        const leaderboardBody = document.getElementById('leaderboard-body');
+        const paginationInfo = document.getElementById('pagination-info');
+        
+        if (!leaderboardBody || !paginationInfo) return;
+        
+        if (users.length === 0) {
+            leaderboardBody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                        No players found. Be the first to join!
+                    </td>
+                </tr>
+            `;
+            paginationInfo.textContent = 'No players found';
+            return;
+        }
+        
+        // Mock some game stats for each user
+        const usersWithStats = users.map(user => {
+            const wins = Math.floor(Math.random() * 50);
+            const losses = Math.floor(Math.random() * 30);
+            const winRate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
+            const points = wins * 20 + losses * 5;
+            
+            return {
+                ...user,
+                wins,
+                losses,
+                winRate,
+                points
+            };
+        });
+        
+        // Sort by points (descending)
+        usersWithStats.sort((a, b) => b.points - a.points);
+        
+        // Generate HTML for each user
+        const userRows = usersWithStats.map((user, index) => {
+            const rank = index + 1;
+            const bgClass = rank === 1 ? 'bg-yellow-50' : rank === 2 ? 'bg-gray-50' : '';
+            const initials = user.display_name.split(' ').map(n => n[0]).join('').toUpperCase();
+            
+            return `
+                <tr class="border-b border-gray-200 ${bgClass}">
+                    <td class="px-4 py-3 font-bold">${rank}</td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center">
+                            <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                                <span class="text-sm font-bold text-white">${initials}</span>
+                            </div>
+                            <div>
+                                <div class="font-medium">${user.display_name}</div>
+                                <div class="text-xs text-gray-500">@${user.username}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 text-green-600 font-medium">${user.wins}</td>
+                    <td class="px-4 py-3 text-red-600 font-medium">${user.losses}</td>
+                    <td class="px-4 py-3 font-medium">${user.winRate}%</td>
+                    <td class="px-4 py-3 font-bold">${user.points}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        leaderboardBody.innerHTML = userRows;
+        paginationInfo.textContent = `Showing 1 to ${users.length} of ${users.length} players`;
+    }
 } 

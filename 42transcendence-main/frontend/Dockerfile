@@ -17,9 +17,9 @@ RUN mkdir -p src/styles && \
     mkdir -p /home/appuser/.npm-global
 
 # Copy configuration files first
-COPY --chown=appuser:appgroup package*.json ./
-COPY --chown=appuser:appgroup tsconfig.json ./
-COPY --chown=appuser:appgroup tailwind.config.js ./
+COPY --chown=appuser:appgroup frontend/package*.json ./
+COPY --chown=appuser:appgroup frontend/tsconfig.json ./
+COPY --chown=appuser:appgroup frontend/tailwind.config.js ./
 
 # Install all dependencies (including dev dependencies)
 RUN npm install && \
@@ -27,7 +27,10 @@ RUN npm install && \
     npm install --save-dev @types/node @types/express typescript
 
 # Copy source files
-COPY --chown=appuser:appgroup src ./src
+COPY --chown=appuser:appgroup frontend/src ./src
+
+# Copy test files
+COPY --chown=appuser:appgroup tests ./tests
 
 # Build the application
 RUN npm run build
@@ -48,6 +51,7 @@ COPY --from=builder --chown=appuser:appgroup /home/appuser/app/node_modules ./no
 COPY --from=builder --chown=appuser:appgroup /home/appuser/app/tsconfig.json ./
 COPY --from=builder --chown=appuser:appgroup /home/appuser/app/tailwind.config.js ./
 COPY --from=builder --chown=appuser:appgroup /home/appuser/app/src ./src
+COPY --from=builder --chown=appuser:appgroup /home/appuser/app/tests ./tests
 
 # Create required directories
 RUN mkdir -p dist src/styles
