@@ -22,7 +22,7 @@ const registerPlugins = async () => {
   await fastify.register(require('@fastify/static'), {
     root: path.join(__dirname, '../dist'),
     prefix: '/',
-    decorateReply: false
+    decorateReply: true
   });
 };
 
