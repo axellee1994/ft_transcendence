@@ -1,0 +1,311 @@
+- 
++ # Backend Implementation Documentation for 42 Transcendence
++ # =====================================================
++ 
++ Table of Contents:
++ 1. Backend Architecture Overview
++ 2. Core Components Explanation
++ 3. API Routes Implementation
++ 4. Frontend-Backend Integration
++ 5. Key Features and Benefits
++ 6. Database Schema
++ 7. Testing and Maintenance
++ 
++ # 1. Backend Architecture Overview
++ 
++ ## Core Technologies
++ 1. Fastify
++    - Modern, fast web framework for Node.js
++    - Designed with performance in mind
++    - Plugin-based architecture
++ 
++ 2. Node.js
++    - JavaScript runtime environment
++    - Event-driven, non-blocking I/O
++    - Large ecosystem of packages
++ 
++ 3. SQLite
++    - Lightweight, file-based database system
++    - Self-contained, serverless
++    - ACID compliant
++ 
++ ## Directory Structure (Backend)
++ ```
++ backend/
++ ├── srcs/
++ │   ├── server.js           # Main server entry point
++ │   ├── plugins/
++ │   │   └── db.js          # Database connection and setup
++ │   ├── routes/
++ │   │   ├── api.js         # API route registration
++ │   │   ├── users.js       # User-related endpoints
++ │   │   ├── games.js       # Game-related endpoints
++ │   │   └── tournaments.js # Tournament-related endpoints
++ │   └── data/
++ │       └── transcendence.db # SQLite database file
++ ```
++ 
++ # 2. Core Components Explanation
++ 
++ ## A. Server Setup (server.js)
++ ```javascript
++ const fastify = require('fastify')({
++   logger: {
++     level: 'info',
++     transport: {
++       target: 'pino-pretty'
++     }
++   }
++ });
++ 
++ // CORS configuration for frontend communication
++ fastify.register(require('@fastify/cors'), {
++   origin: '*',
++   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
++   allowedHeaders: ['Content-Type', 'Authorization']
++ });
++ 
++ // Register plugins and routes
++ async function registerPlugins() {
++   await fastify.register(require('./plugins/db'));
++ }
++ 
++ async function registerRoutes() {
++   await fastify.register(require('./routes/api'), { prefix: '/api' });
++ }
++ ```
++ 
++ This file:
++ - Creates the Fastify server instance
++ - Configures logging for debugging and monitoring
++ - Sets up CORS to allow frontend communication
++ - Registers database plugin and routes
++ 
++ ## B. Database Setup (plugins/db.js)
++ ```javascript
++ const fastifyPlugin = require('fastify-plugin');
++ const sqlite3 = require('sqlite3').verbose();
++ const { open } = require('sqlite');
++ 
++ async function dbConnector(fastify, options) {
++   const db = await open({
++     filename: './data/transcendence.db',
++     driver: sqlite3.Database
++   });
++   
++   // Create tables if they don't exist
++   await db.exec(`
++     CREATE TABLE IF NOT EXISTS users (
++       id INTEGER PRIMARY KEY AUTOINCREMENT,
++       username TEXT UNIQUE NOT NULL,
++       display_name TEXT,
++       avatar TEXT,
++       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
++     );
++     // ... other table definitions
++   `);
++   
++   // Add database methods to Fastify instance
++   fastify.decorate('db', {
++     async all(sql, params = []) {
++       return await db.all(sql, params);
++     },
++     async get(sql, params = []) {
++       return await db.get(sql, params);
++     },
++     async run(sql, params = []) {
++       return await db.run(sql, params);
++     }
++   });
++ }
++ ```
++ 
++ This plugin:
++ - Establishes SQLite database connection
++ - Creates necessary tables if they don't exist
++ - Provides database query methods to the Fastify instance
++ 
++ # 3. API Routes Implementation
++ 
++ ## A. API Route Registration (routes/api.js)
++ ```javascript
++ async function apiRoutes(fastify, options) {
++   // Register individual route modules
++   fastify.register(require('./users'), { prefix: '/users' });
++   fastify.register(require('./games'), { prefix: '/games' });
++   fastify.register(require('./tournaments'), { prefix: '/tournaments' });
++ }
++ ```
++ 
++ ## B. Example Route Implementation (routes/users.js)
++ ```javascript
++ async function userRoutes(fastify, options) {
++   // Get all users
++   fastify.get('/', async (request, reply) => {
++     const users = await fastify.db.all('SELECT * FROM users');
++     return users;
++   });
++ 
++   // Create user
++   fastify.post('/', async (request, reply) => {
++     const { username, display_name } = request.body;
++     const result = await fastify.db.run(
++       'INSERT INTO users (username, display_name) VALUES (?, ?)',
++       [username, display_name]
++     );
++     reply.code(201);
++     return { id: result.lastID, username, display_name };
++   });
++ }
++ ```
++ 
++ # 4. Frontend-Backend Integration
++ 
++ ## A. API Communication
++ The frontend communicates with the backend using fetch API:
++ ```javascript
++ // Example frontend API call
++ async function getUsers() {
++   const response = await fetch('http://localhost:3001/api/users');
++   const users = await response.json();
++   return users;
++ }
++ ```
++ 
++ ## B. Data Flow
++ 1. Frontend makes HTTP request to backend
++ 2. Fastify routes handle the request
++ 3. Database operations are performed
++ 4. Response is sent back to frontend
++ 
++ # 5. Key Features and Benefits
++ 
++ ## A. Fastify Features Used
++ 1. Plugin System
++    - Modular code organization
++    - Easy to extend functionality
++    - Clean separation of concerns
++ 
++ 2. Route Registration
++    - Clean API endpoint definition
++    - Prefix support for route grouping
++    - Middleware support
++ 
++ 3. Request Validation
++    - Built-in request validation
++    - Schema-based validation
++    - Type checking
++ 
++ ## B. SQLite Benefits
++ 1. File-based
++    - No separate database server needed
++    - Simple backup (just copy the file)
++    - Easy to deploy
++ 
++ 2. ACID Compliant
++    - Reliable data transactions
++    - Data integrity guaranteed
++    - Concurrent access handling
++ 
++ 3. Zero Configuration
++    - Works out of the box
++    - No complex setup needed
++    - Perfect for development
++ 
++ # 6. Database Schema
++ 
++ ```sql
++ -- Users Table
++ CREATE TABLE users (
++   id INTEGER PRIMARY KEY AUTOINCREMENT,
++   username TEXT UNIQUE NOT NULL,
++   display_name TEXT,
++   avatar TEXT,
++   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
++ );
++ 
++ -- Games Table
++ CREATE TABLE games (
++   id INTEGER PRIMARY KEY AUTOINCREMENT,
++   player1_id INTEGER NOT NULL,
++   player2_id INTEGER NOT NULL,
++   player1_score INTEGER DEFAULT 0,
++   player2_score INTEGER DEFAULT 0,
++   status TEXT DEFAULT 'pending',
++   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++   updated_at TIMESTAMP,
++   FOREIGN KEY (player1_id) REFERENCES users (id),
++   FOREIGN KEY (player2_id) REFERENCES users (id)
++ );
++ 
++ -- Tournaments Table
++ CREATE TABLE tournaments (
++   id INTEGER PRIMARY KEY AUTOINCREMENT,
++   name TEXT NOT NULL,
++   description TEXT,
++   start_date TEXT,
++   end_date TEXT,
++   status TEXT DEFAULT 'pending',
++   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
++ );
++ 
++ -- Tournament Participants Table
++ CREATE TABLE tournament_participants (
++   tournament_id INTEGER NOT NULL,
++   user_id INTEGER NOT NULL,
++   status TEXT DEFAULT 'registered',
++   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++   PRIMARY KEY (tournament_id, user_id),
++   FOREIGN KEY (tournament_id) REFERENCES tournaments (id),
++   FOREIGN KEY (user_id) REFERENCES users (id)
++ );
++ ```
++ 
++ # 7. Testing and Maintenance
++ 
++ ## A. API Testing
++ 1. Browser-based testing interface (/tests/api-test.html)
++    - Interactive UI for testing endpoints
++    - Real-time response display
++    - Easy to use for manual testing
++ 
++ 2. Node.js test script (/tests/api-test.js)
++    - Automated testing of all endpoints
++    - Comprehensive test coverage
++    - Console output for results
++ 
++ ## B. Error Handling
++ ```javascript
++ fastify.setErrorHandler((error, request, reply) => {
++   fastify.log.error(error);
++   reply.status(500).send({ error: 'Internal Server Error' });
++ });
++ ```
++ 
++ ## C. Monitoring and Debugging
++ 1. Logging
++    - Request logging
++    - Error logging
++    - Performance monitoring
++ 
++ 2. Database Management
++    - Regular backups
++    - Data integrity checks
++    - Performance optimization
++ 
++ # Additional Resources
++ 
++ 1. Fastify Documentation: https://www.fastify.io/docs/latest/
++ 2. SQLite Documentation: https://www.sqlite.org/docs.html
++ 3. Node.js Documentation: https://nodejs.org/en/docs/
++ 
++ # Notes
++ 
++ - All API endpoints are prefixed with /api
++ - Database file is stored in ./data/transcendence.db
++ - Frontend communicates with backend on port 3001
++ - CORS is enabled for development (should be restricted in production)
++ 
++ # Testing Commands
++ 
++ See RawCommands.txt for a complete list of testing commands and examples.
