@@ -1,25 +1,52 @@
-const express = require('express');
+const fastify = require('fastify')({
+  logger: {
+    level: 'info',
+    transport: {
+      target: 'pino-pretty'
+    }
+  }
+});
 const path = require('path');
-const app = express();
 const port = 3000;
 
-// Serve static files from the tests directory
-app.use('/tests', express.static(path.join(__dirname, '../tests')));
+// Register Fastify Static plugin
+const registerPlugins = async () => {
+  // For serving test files
+  await fastify.register(require('@fastify/static'), {
+    root: path.join(__dirname, '../tests'),
+    prefix: '/tests/',
+    decorateReply: false
+  });
 
-// Serve static files from the dist directory
-app.use(express.static(path.join(__dirname, '../dist')));
+  // For serving static files from dist
+  await fastify.register(require('@fastify/static'), {
+    root: path.join(__dirname, '../dist'),
+    prefix: '/',
+    decorateReply: false
+  });
+};
 
 // Handle client-side routing by redirecting all requests to index.html
 // except for requests to /tests
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/tests')) {
-    next();
+fastify.setNotFoundHandler((request, reply) => {
+  if (request.url.startsWith('/tests/')) {
+    reply.code(404).send({ error: 'Not found' });
   } else {
-    res.sendFile(path.join(__dirname, '../dist/index.html'));
+    reply.sendFile('index.html');
   }
 });
 
-app.listen(port, () => {
-  console.log(`Frontend server running at http://localhost:${port}`);
-  console.log(`Test files available at http://localhost:${port}/tests`);
-}); 
+// Start the server
+const start = async () => {
+  try {
+    await registerPlugins();
+    await fastify.listen({ port: port, host: '0.0.0.0' });
+    fastify.log.info(`Frontend server running at http://localhost:${port}`);
+    fastify.log.info(`Test files available at http://localhost:${port}/tests`);
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+};
+
+start(); 

@@ -23,8 +23,8 @@ COPY --chown=appuser:appgroup frontend/tailwind.config.js ./
 
 # Install all dependencies (including dev dependencies)
 RUN npm install && \
-    npm install @babylonjs/core@6.47.0 tailwindcss@3.4.1 express@4.18.2 && \
-    npm install --save-dev @types/node @types/express typescript
+    npm install @babylonjs/core@6.47.0 tailwindcss@3.4.1 fastify@4.21.0 @fastify/static@6.10.2 pino-pretty@10.2.0 && \
+    npm install --save-dev @types/node typescript
 
 # Copy source files
 COPY --chown=appuser:appgroup frontend/src ./src
