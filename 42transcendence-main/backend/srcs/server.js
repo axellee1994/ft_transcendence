@@ -19,11 +19,6 @@ fastify.register(require('@fastify/cors'), {
 
 // Register plugins
 async function registerPlugins() {
-  // WebSocket for real-time game communication
-  await fastify.register(require('@fastify/websocket'), {
-    options: { maxPayload: 1048576 } // 1MB max payload
-  });
-
   // Database connection
   await fastify.register(require('./plugins/db'));
 }
