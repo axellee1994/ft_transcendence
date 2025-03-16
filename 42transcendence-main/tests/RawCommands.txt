@@ -42,6 +42,9 @@
 + 
 + # Register a user for a tournament (replace IDs as needed)
 + curl -X POST -H "Content-Type: application/json" -d '{"user_id": 1}' http://localhost:3001/api/tournaments/1/participants
++
++ # Start the tournament
++ curl -X PUT -H "Content-Type: application/json" -d '{"status": "ongoing"}' http://localhost:3001/api/tournaments/1
 + 
 + # 6. Framework Checker Testing
 + cd /home/axlee/Desktop/ft_transcendence/42transcendence-main
