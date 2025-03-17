@@ -1,6 +1,6 @@
-const fetch = require('node-fetch');
+import fetch from 'node-fetch';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = 'http://localhost:4002/api';
 
 async function testAPI() {
   try {
@@ -8,7 +8,7 @@ async function testAPI() {
     
     // Test health endpoint
     console.log('\n--- Testing health endpoint ---');
-    const healthResponse = await fetch('http://localhost:3001/health');
+    const healthResponse = await fetch('http://localhost:4002/health');
     console.log('Status:', healthResponse.status);
     console.log('Response:', await healthResponse.json());
     
@@ -120,12 +120,5 @@ async function testAPI() {
   }
 }
 
-// Export the test function
-module.exports = {
-  testAPI
-};
-
-// Run the test if this file is executed directly
-if (require.main === module) {
-  testAPI();
-} 
+// Run the test
+testAPI(); 

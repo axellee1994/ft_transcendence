@@ -1,66 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="/">
     <title>42 Transcendence</title>
-    <link href="./styles.css" rel="stylesheet">
-    <script src="https://cdn.babylonjs.com/babylon.js"></script>
-    <style>
-        #renderCanvas {
-            width: 100%;
-            height: 400px;
-            touch-action: none;
-            outline: none;
-            border: 2px solid black;
-            background-color: #f0f0f0;
-        }
-    </style>
-</head>
-<body class="bg-gradient-to-r from-blue-500 to-purple-600 min-h-screen">
-    <!-- Navigation Bar -->
-    <nav class="bg-gray-800 text-white p-4">
-        <div class="container mx-auto flex flex-wrap items-center justify-between">
-            <div class="flex items-center">
-                <span class="font-bold text-xl">42 Transcendence</span>
-            </div>
-            <div class="flex flex-wrap space-x-4">
-                <a href="/" class="hover:text-blue-300 transition">Home</a>
-                <a href="/game" class="hover:text-blue-300 transition">Game</a>
-                <a href="/tournament" class="hover:text-blue-300 transition">Tournament</a>
-                <a href="/profile" class="hover:text-blue-300 transition">Profile</a>
-                <a href="/leaderboard" class="hover:text-blue-300 transition">Leaderboard</a>
-                <a href="/settings" class="hover:text-blue-300 transition">Settings</a>
-                <a href="/about" class="hover:text-blue-300 transition">About</a>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Main Content Area -->
-    <div id="content" class="container mx-auto px-4 py-8">
-        <div class="bg-white rounded-lg shadow-xl p-8 max-w-2xl mx-auto mt-10">
-            <h1 class="text-4xl font-bold text-center mb-6 text-gray-800">42 Transcendence</h1>
-            <p class="text-lg text-gray-600 text-center mb-4">Welcome to the game</p>
-            <canvas id="renderCanvas" touch-action="none"></canvas>
-            <div class="flex justify-center space-x-4 mt-4">
-                <button class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-200">
-                    Play Game
-                </button>
-                <button class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded transition duration-200">
-                    Profile
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Footer -->
-    <footer class="bg-gray-800 text-white p-4 mt-auto">
-        <div class="container mx-auto text-center">
-            <p>© 2023 42 Transcendence - All rights reserved</p>
-        </div>
-    </footer>
-
-    <!-- Scripts -->
-    <script type="module" src="./main.js"></script>
-</body>
-</html>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="index.ts"></script>
+  </body>
+</html> 

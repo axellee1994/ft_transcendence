@@ -1,42 +1,48 @@
+version: '3.8'
+
 services:
   # Frontend Service Configuration
   frontend:
-    build: 
-      context: .  # Changed to root context to access tests
-      dockerfile: ./frontend/Dockerfile
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
       no_cache: true
     ports:
-      # Dynamic port mapping with fallback to 3000
-      # FRONTEND_PORT can be changed without modifying this file
-      - "3000:3000"
-    # Ensure container restarts unless explicitly stopped
-    # This improves reliability in production
+      - "4000:4000"
     restart: unless-stopped
     environment:
-      # Production mode for better performance and security
       - NODE_ENV=development
-      - API_URL=http://backend:3001
-    # Removed volume mounts
+      - API_URL=http://localhost:4002
     init: true
-    tty: true
-    stdin_open: true
-    command: sh -c "npm run start"  # Add ls command to see files
-    depends_on:
-      - backend
+    user: root
 
-  # Backend Service Configuration
   backend:
     build:
-      context: .  # Changed to root context to access tests
-      dockerfile: ./backend/srcs/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
       no_cache: true
     ports:
-      - "3001:3001"
+      - "4002:4002"
     restart: unless-stopped
     environment:
       - NODE_ENV=development
-    # Removed volume mounts
     init: true
-    tty: true
-    stdin_open: true
+    user: root
+
+  # Pong Standalone Service
+  pongstandalone:
+    build:
+      context: ./pongstandalone-tomerge
+      dockerfile: Dockerfile
+      no_cache: true
+    ports:
+      - "4001:4001"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+    init: true
+    user: root
+
+volumes:
+  backend_data:
 

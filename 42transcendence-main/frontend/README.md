@@ -17,7 +17,7 @@ docker-compose up
 
 This will:
 - Build the frontend container
-- Start the development server on port 3000
+- Start the application on port 4001 (served through the backend)
 - Enable hot-reload for both TypeScript and Tailwind CSS
 
 ## Project Structure

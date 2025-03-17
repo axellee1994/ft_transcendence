@@ -23,10 +23,10 @@ Table of Contents:
    - Rapid UI development
    - Responsive design system
 
-3. Babylon.js
-   - 3D game engine for web browsers
-   - WebGL-based rendering
-   - Physics engine integration
+3. Router System
+   - Custom client-side routing
+   - History API integration
+   - Dynamic component loading
 
 ## Directory Structure (Frontend)
 ```
@@ -41,166 +41,119 @@ frontend/
 │   │   ├── Navigation.ts
 │   │   └── Forms/
 │   ├── game/          # Game engine related code
-│   │   ├── Scene.ts
-│   │   ├── Physics.ts
+│   │   ├── Pong.ts
+│   │   ├── MultiViewPong.ts
 │   │   └── Controls.ts
-│   ├── styles/        # Global styles
-│   │   └── tailwind.css
-│   └── utils/         # Helper functions
-       └── api.ts
+│   ├── router/        # Routing system
+│   │   └── router.ts
+│   └── styles/        # Global styles
+       └── tailwind.css
 ```
 
 # 2. Core Components Explanation
 
-## A. Page Setup (pages/SettingsPage.ts)
+## A. Router Implementation (router/router.ts)
 ```typescript
-export function renderSettingsPage(container: HTMLElement): void {
+type Route = {
+  path: string;
+  component: (container: HTMLElement) => void;
+};
+
+const routes: Route[] = [];
+
+export function registerRoute(path: string, component: (container: HTMLElement) => void): void {
+  routes.push({ path, component });
+}
+
+export function initRouter(container: HTMLElement): void {
+  // Handle navigation
+  function navigate(path: string): void {
+    const route = routes.find(r => r.path === path) || routes[0];
+    route.component(container);
+    window.history.pushState({}, '', path);
+  }
+
+  // Initial route
+  navigate(window.location.pathname);
+
+  // Handle browser back/forward
+  window.addEventListener('popstate', () => {
+    navigate(window.location.pathname);
+  });
+
+  // Expose navigate function globally
+  (window as any).navigate = navigate;
+}
+```
+
+## B. Page Components
+```typescript
+// pages/HomePage.ts
+export function renderHomePage(container: HTMLElement): void {
   container.innerHTML = `
     <div class="min-h-screen bg-gray-100">
-      <nav class="settings-nav">
-        <!-- Navigation tabs -->
-        <button class="tab active" data-tab="account">Account</button>
-        <button class="tab" data-tab="game">Game Settings</button>
-      </nav>
-      
-      <div class="settings-content">
-        <!-- Account Settings Form -->
-        <form id="accountSettings" class="settings-form active">
-          <!-- Form fields -->
-        </form>
-        
-        <!-- Game Settings Form -->
-        <form id="gameSettings" class="settings-form">
-          <!-- Form fields -->
-        </form>
-      </div>
-    </div>
-  `;
-  
-  // Register event listeners
-  setupTabNavigation();
-  setupFormHandlers();
-}
-```
-
-## B. Game Engine Setup (game/Scene.ts)
-```typescript
-import { Engine, Scene, FreeCamera, Vector3, HemisphericLight } from '@babylonjs/core';
-
-export class GameScene {
-  private canvas: HTMLCanvasElement;
-  private engine: Engine;
-  private scene: Scene;
-
-  constructor(canvasElement: string) {
-    this.canvas = document.getElementById(canvasElement) as HTMLCanvasElement;
-    this.engine = new Engine(this.canvas, true);
-    this.scene = new Scene(this.engine);
-    
-    this.setupCamera();
-    this.setupLights();
-    this.createGameObjects();
-  }
-
-  private setupCamera(): void {
-    const camera = new FreeCamera('camera1', 
-      new Vector3(0, 5, -10), this.scene);
-    camera.setTarget(Vector3.Zero());
-  }
-
-  // ... other setup methods
-}
-```
-
-# 3. Page Components Implementation
-
-## A. Component Structure
-```typescript
-// components/Navigation.ts
-export class Navigation {
-  private container: HTMLElement;
-  
-  constructor(container: HTMLElement) {
-    this.container = container;
-    this.render();
-    this.setupEventListeners();
-  }
-
-  private render(): void {
-    this.container.innerHTML = `
-      <nav class="bg-gray-800 text-white">
+      <nav class="bg-white shadow-lg">
         <div class="container mx-auto px-4">
-          <!-- Navigation items -->
+          <button onclick="navigate('/play')" class="btn-primary">
+            Play
+          </button>
+          <!-- Other navigation items -->
         </div>
       </nav>
-    `;
-  }
+      <!-- Main content -->
+    </div>
+  `;
 }
 ```
 
-## B. Form Handling
-```typescript
-// components/Forms/SettingsForm.ts
-export class SettingsForm {
-  private form: HTMLFormElement;
-  
-  constructor(formId: string) {
-    this.form = document.getElementById(formId) as HTMLFormElement;
-    this.setupValidation();
-    this.handleSubmit();
-  }
+# 3. Service Configuration
 
-  private async handleSubmit(): Promise<void> {
-    this.form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const formData = new FormData(this.form);
-      // API call to save settings
-    });
-  }
+## A. Port Configuration
+- Frontend Service: http://localhost:4000
+- Backend Service: http://localhost:4002
+- Pong Game Service: http://localhost:4001
+
+## B. API Integration
+```typescript
+const API_BASE_URL = 'http://localhost:4002/api';
+
+async function apiCall(endpoint: string, options = {}) {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+  return response.json();
 }
 ```
 
-# 4. Game Engine Integration
+# 4. Game Implementation
 
-## A. Physics Setup
+## A. Game Modes
+1. Single View Pong
+   - Classic pong gameplay
+   - Local player controls
+   - AI opponent option
+
+2. Multi View Pong
+   - Multiplayer support
+   - Real-time gameplay
+   - WebSocket communication
+
+## B. Game State Management
 ```typescript
-// game/Physics.ts
-import { PhysicsImpostor, Scene, Vector3 } from '@babylonjs/core';
+class GameState {
+  private score: { player1: number; player2: number };
+  private gameStatus: 'waiting' | 'playing' | 'finished';
 
-export class GamePhysics {
-  private scene: Scene;
-
-  constructor(scene: Scene) {
-    this.scene = scene;
-    this.setupPhysics();
+  constructor() {
+    this.score = { player1: 0, player2: 0 };
+    this.gameStatus = 'waiting';
   }
 
-  private setupPhysics(): void {
-    this.scene.enablePhysics(new Vector3(0, -9.81, 0));
-    // Setup collision detection
-  }
-}
-```
-
-## B. Controls Implementation
-```typescript
-// game/Controls.ts
-export class PlayerControls {
-  private static readonly MOVEMENT_SPEED = 0.1;
-  
-  constructor(scene: Scene, paddle: Mesh) {
-    this.setupKeyboardControls(paddle);
-  }
-
-  private setupKeyboardControls(paddle: Mesh): void {
-    scene.onKeyboardObservable.add((kbInfo) => {
-      switch (kbInfo.type) {
-        case KeyboardEventTypes.KEYDOWN:
-          this.handleKeyDown(kbInfo.event.key, paddle);
-          break;
-      }
-    });
-  }
+  // State management methods
 }
 ```
 
@@ -317,29 +270,26 @@ describe('GameScene', () => {
 
 # Notes
 
-- All components are written in TypeScript
-- Styling uses Tailwind CSS utility classes
-- Game engine uses Babylon.js for 3D rendering
-- Frontend runs on port 3000
-- Backend API calls are made to port 3001
+- Frontend runs on port 4000
+- Backend API calls are made to port 4002
+- Pong game service runs on port 4001
+- All services are containerized using Docker
+- Inter-service communication is handled through Docker network
 
 # Development Commands
 
 ```bash
-# Install dependencies
-npm install
+# Build and start all services
+docker compose up --build -d
 
-# Start development server
-npm run dev
+# Start development server only
+docker compose up frontend
 
 # Build for production
-npm run build
+docker compose build frontend
 
-# Run tests
-npm test
-
-# Lint code
-npm run lint
+# View logs
+docker compose logs frontend
 ```
 
-See package.json for complete list of available commands. 
+See docker-compose.yml for complete service configuration. 

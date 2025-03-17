@@ -1,19 +1,14 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "ES2020",
-    "outDir": "./dist",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "lib": ["ES2020", "DOM"],
+    "target": "es6",
+    "module": "commonjs",
     "moduleResolution": "node",
-    "allowJs": true,
-    "baseUrl": ".",
-    "paths": {
-      "@babylonjs/*": ["node_modules/@babylonjs/*"]
-    }
+    "noResolve": false,
+    "noImplicitAny": false,
+    "sourceMap": true,
+    "preserveConstEnums": true,
+    "lib": ["dom", "es6"],
+    "outDir": "dist"
   },
   "include": ["src/**/*"]
 }

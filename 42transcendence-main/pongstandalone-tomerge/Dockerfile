@@ -1,8 +1,5 @@
 FROM node:20-alpine
 
-# Set root as the user for rootless mode compatibility
-USER root
-
 WORKDIR /app
 
 # Copy package files
@@ -14,11 +11,11 @@ RUN npm install
 # Copy project files
 COPY . .
 
-# Build the project for production
+# Build the project
 RUN npm run build
 
 # Expose port 4000
 EXPOSE 4000
 
-# Start development server
-CMD ["npm", "start"]
+# Start the application
+CMD ["npm", "start"] 
