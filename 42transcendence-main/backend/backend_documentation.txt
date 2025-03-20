@@ -220,13 +220,36 @@ export const bcryptHandler = fp(bcryptPlugin, {
 
 ## B. Database Configuration
 ```javascript
-const db = knex({
-    client: 'sqlite3',
-    connection: {
-        filename: join(__dirname, '../db/transcendence.sqlite')
-    },
-    useNullAsDefault: true
+const sqlite3 = require('sqlite3').verbose();
+const { open } = require('sqlite');
+
+const db = await open({
+    filename: join(__dirname, '../db/transcendence.sqlite'),
+    driver: sqlite3.Database
 });
+
+// Example query using SQLite
+await db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+`);
+
+// Example of a query with parameters
+await db.run(`
+    INSERT INTO users (username, email, password_hash)
+    VALUES (?, ?, ?)
+`, [username, email, hashedPassword]);
+
+// Example of retrieving data
+const user = await db.get(`
+    SELECT * FROM users WHERE id = ?
+`, userId);
 ```
 
 # 5. Security Features
@@ -254,48 +277,75 @@ await fastify.register(cors, {
 
 ```sql
 -- Users Table
-CREATE TABLE users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  username TEXT UNIQUE NOT NULL,
-  display_name TEXT,
-  avatar TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    display_name TEXT,
+    email TEXT UNIQUE,
+    password_hash TEXT NOT NULL,
+    avatar_url TEXT,
+    wins INTEGER DEFAULT 0,
+    losses INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Games Table
-CREATE TABLE games (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  player1_id INTEGER NOT NULL,
-  player2_id INTEGER NOT NULL,
-  player1_score INTEGER DEFAULT 0,
-  player2_score INTEGER DEFAULT 0,
-  status TEXT DEFAULT 'pending',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP,
-  FOREIGN KEY (player1_id) REFERENCES users (id),
-  FOREIGN KEY (player2_id) REFERENCES users (id)
+CREATE TABLE IF NOT EXISTS games (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player1_id INTEGER NOT NULL,
+    player2_id INTEGER,
+    player1_score INTEGER DEFAULT 0,
+    player2_score INTEGER DEFAULT 0,
+    game_type TEXT NOT NULL CHECK(game_type IN ('single', 'multi')),
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'active', 'completed')),
+    winner_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (player1_id) REFERENCES users (id),
+    FOREIGN KEY (player2_id) REFERENCES users (id),
+    FOREIGN KEY (winner_id) REFERENCES users (id)
 );
 
 -- Tournaments Table
-CREATE TABLE tournaments (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  description TEXT,
-  start_date TEXT,
-  end_date TEXT,
-  status TEXT DEFAULT 'pending',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS tournaments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    start_date TEXT,
+    end_date TEXT,
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'active', 'completed')),
+    winner_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (winner_id) REFERENCES users (id)
 );
 
 -- Tournament Participants Table
-CREATE TABLE tournament_participants (
-  tournament_id INTEGER NOT NULL,
-  user_id INTEGER NOT NULL,
-  status TEXT DEFAULT 'registered',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (tournament_id, user_id),
-  FOREIGN KEY (tournament_id) REFERENCES tournaments (id),
-  FOREIGN KEY (user_id) REFERENCES users (id)
+CREATE TABLE IF NOT EXISTS tournament_participants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tournament_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'registered' CHECK(status IN ('registered', 'active', 'eliminated')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(tournament_id, user_id),
+    FOREIGN KEY (tournament_id) REFERENCES tournaments (id),
+    FOREIGN KEY (user_id) REFERENCES users (id)
+);
+
+-- Tournament Games Table
+CREATE TABLE IF NOT EXISTS tournament_games (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tournament_id INTEGER NOT NULL,
+    game_id INTEGER NOT NULL,
+    round INTEGER NOT NULL,
+    match_number INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(tournament_id, round, match_number),
+    FOREIGN KEY (tournament_id) REFERENCES tournaments (id),
+    FOREIGN KEY (game_id) REFERENCES games (id)
 );
 ```
 
@@ -314,22 +364,40 @@ CREATE TABLE tournament_participants (
 
 ## B. Error Handling
 ```javascript
-fastify.setErrorHandler((error, request, reply) => {
-  fastify.log.error(error);
-  reply.status(500).send({ error: 'Internal Server Error' });
-});
+// Example of SQLite error handling
+try {
+    const result = await db.run(`
+        INSERT INTO users (username, email)
+        VALUES (?, ?)
+    `, [username, email]);
+} catch (error) {
+    if (error.code === 'SQLITE_CONSTRAINT') {
+        // Handle unique constraint violation
+        reply.code(400).send({ error: 'Username or email already exists' });
+    } else {
+        // Handle other database errors
+        fastify.log.error(error);
+        reply.code(500).send({ error: 'Internal Server Error' });
+    }
+}
 ```
 
 ## C. Monitoring and Debugging
 1. Logging
-   - Request logging
-   - Error logging
-   - Performance monitoring
+   - Request logging with Fastify's built-in logger
+   - Error logging with stack traces
+   - Performance monitoring using SQLite's EXPLAIN QUERY PLAN
 
 2. Database Management
-   - Regular backups
-   - Data integrity checks
-   - Performance optimization
+   - Regular SQLite database backups using `.backup` command
+   - Data integrity checks with `PRAGMA integrity_check`
+   - Performance optimization with proper indexing
+   ```sql
+   -- Example of adding indexes for performance
+   CREATE INDEX IF NOT EXISTS idx_games_player1 ON games(player1_id);
+   CREATE INDEX IF NOT EXISTS idx_games_player2 ON games(player2_id);
+   CREATE INDEX IF NOT EXISTS idx_tournament_participants ON tournament_participants(tournament_id, user_id);
+   ```
 
 # Additional Resources
 
@@ -362,6 +430,14 @@ curl -X POST http://localhost:4002/api/auth/login \
 # Test protected endpoint
 curl http://localhost:4002/api/auth/me \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
+
+# SQLite CLI commands for database inspection
+sqlite3 ./data/transcendence.db << EOF
+.tables
+.schema users
+SELECT COUNT(*) FROM users;
+.quit
+EOF
 ```
 
 See docker-compose.yml for complete service configuration.

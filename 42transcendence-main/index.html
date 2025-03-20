@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="/">
+    <title>42 Transcendence</title>
+    <style>
+      .test-nav {
+        background-color: red;
+        color: white;
+        padding: 16px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 18px;
+        margin-bottom: 16px;
+      }
+      
+      .blue-nav {
+        background-color: blue;
+        padding: 16px;
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .login-btn {
+        background-color: white;
+        color: blue;
+        padding: 8px 16px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+      }
+    </style>
+    <script>
+      // This is a direct script to test if JavaScript is executing
+      window.directScriptExecuted = true;
+      console.log('Direct script executed');
+      
+      // Add a listener for when the DOM is loaded
+      document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('debug-info').textContent = 'Direct script worked, waiting for bundled JS...';
+        
+        // Check if bundled script is loaded after 2 seconds
+        setTimeout(function() {
+          if (window.bundledScriptExecuted) {
+            document.getElementById('debug-info').textContent = 'Both direct and bundled scripts worked!';
+          } else {
+            document.getElementById('debug-info').textContent = 'Direct script worked, but bundled script failed!';
+            
+            // Add the navigation manually as fallback
+            const navContainer = document.getElementById('navigation-container');
+            if (navContainer) {
+              navContainer.innerHTML = `
+                <nav style="background-color: purple; padding: 16px; color: white; display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <h1 style="font-weight: bold; font-size: 20px;">TRANSCENDENCE (FALLBACK)</h1>
+                  </div>
+                  <div>
+                    <button style="background-color: white; color: purple; padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer;">
+                      Login
+                    </button>
+                  </div>
+                </nav>
+              `;
+            }
+          }
+        }, 2000);
+      });
+    </script>
+  </head>
+  <body>
+    <!-- Test navigation with inline styles -->
+    <div class="test-nav">TEST NAVIGATION (RED BACKGROUND)</div>
+    
+    <!-- Navigation container -->
+    <div id="navigation-container"></div>
+    
+    <!-- App container -->
+    <div id="app"></div>
+    
+    <!-- Debug info -->
+    <div id="debug-info" style="position: fixed; bottom: 50px; left: 10px; background-color: black; color: white; padding: 10px; z-index: 9999;">
+      Waiting for JavaScript to load...
+    </div>
+  <script defer src="/runtime.bundle.js"></script><script defer src="/index.bundle.js"></script></body>
+</html> 

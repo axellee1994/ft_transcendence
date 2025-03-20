@@ -1,4 +1,4 @@
-version: '3.8'
+#version: '3.8'
 
 services:
   # Frontend Service Configuration
@@ -6,28 +6,24 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      no_cache: true
     ports:
       - "4000:4000"
-    restart: unless-stopped
     environment:
-      - NODE_ENV=development
-      - API_URL=http://localhost:4002
+      - NODE_ENV=production
     init: true
-    user: root
+    user: "root"
 
+  # Backend Service Configuration
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      no_cache: true
     ports:
       - "4002:4002"
-    restart: unless-stopped
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
     init: true
-    user: root
+    user: "root"
 
   # Pong Standalone Service
   pongstandalone:
@@ -43,6 +39,11 @@ services:
     init: true
     user: root
 
+networks:
+  app_network:
+    driver: bridge
+
 volumes:
   backend_data:
+    driver: local
 

@@ -17,10 +17,10 @@ export async function authRoutes(fastify, options) {
         
         try {
             // Check if user already exists
-            const existingUser = await fastify.db('users')
-                .where({ username })
-                .orWhere({ email })
-                .first();
+            const existingUser = await fastify.db.get(`
+                SELECT id FROM users 
+                WHERE username = ? OR email = ?
+            `, [username, email]);
                 
             if (existingUser) {
                 reply.code(400).send({
@@ -30,24 +30,34 @@ export async function authRoutes(fastify, options) {
             }
             
             // Create new user
-            const user = await fastify.db('users')
-                .insert({
-                    username,
-                    email,
-                    password_hash: await fastify.bcrypt.hash(password),
-                    created_at: new Date(),
-                    updated_at: new Date()
-                })
-                .returning(['id', 'username', 'email', 'created_at']);
+            const result = await fastify.db.run(`
+                INSERT INTO users (
+                    username, email, password_hash, 
+                    is_online, last_seen, created_at, updated_at
+                ) VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            `, [username, email, await fastify.bcrypt.hash(password)]);
+            
+            const user = await fastify.db.get(`
+                SELECT id, username, email, created_at 
+                FROM users WHERE id = ?
+            `, result.lastID);
             
             // Generate token
             const token = fastify.jwt.sign({ id: user.id });
             
             reply.code(201).send({
-                user,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    email: user.email,
+                    display_name: user.display_name,
+                    is_online: user.is_online,
+                    last_seen: user.last_seen
+                },
                 token
             });
         } catch (error) {
+            fastify.log.error(error);
             reply.code(500).send({
                 error: 'Error creating user'
             });
@@ -71,13 +81,22 @@ export async function authRoutes(fastify, options) {
         
         try {
             // Find user
-            const user = await fastify.db('users')
-                .where({ username })
-                .first();
+            const user = await fastify.db.get(`
+                SELECT * FROM users WHERE username = ?
+            `, username);
                 
             if (!user) {
                 reply.code(401).send({
-                    error: 'Invalid credentials'
+                    error: 'Username not found. Please check your credentials.'
+                });
+                return;
+            }
+            
+            // Check if password_hash exists
+            if (!user.password_hash) {
+                fastify.log.error(`User ${username} has no password hash`);
+                reply.code(401).send({
+                    error: 'Account issue. Please contact administrator.'
                 });
                 return;
             }
@@ -86,10 +105,17 @@ export async function authRoutes(fastify, options) {
             const valid = await fastify.bcrypt.compare(password, user.password_hash);
             if (!valid) {
                 reply.code(401).send({
-                    error: 'Invalid credentials'
+                    error: 'Incorrect password. Please try again.'
                 });
                 return;
             }
+            
+            // Update user's online status
+            await fastify.db.run(`
+                UPDATE users 
+                SET is_online = 1, last_seen = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            `, user.id);
             
             // Generate token
             const token = fastify.jwt.sign({ id: user.id });
@@ -98,13 +124,17 @@ export async function authRoutes(fastify, options) {
                 user: {
                     id: user.id,
                     username: user.username,
-                    email: user.email
+                    email: user.email,
+                    display_name: user.display_name,
+                    is_online: user.is_online,
+                    last_seen: user.last_seen
                 },
                 token
             });
         } catch (error) {
+            fastify.log.error(error);
             reply.code(500).send({
-                error: 'Error during login'
+                error: 'Server error during login. Please try again later.'
             });
         }
     });
@@ -114,9 +144,9 @@ export async function authRoutes(fastify, options) {
         onRequest: [fastify.authenticate]
     }, async (request, reply) => {
         try {
-            const user = await fastify.db('users')
-                .where({ id: request.user.id })
-                .first();
+            const user = await fastify.db.get(`
+                SELECT * FROM users WHERE id = ?
+            `, request.user.id);
                 
             if (!user) {
                 reply.code(404).send({
@@ -134,6 +164,7 @@ export async function authRoutes(fastify, options) {
                 losses: user.losses
             });
         } catch (error) {
+            fastify.log.error(error);
             reply.code(500).send({
                 error: 'Error fetching user'
             });
@@ -144,8 +175,20 @@ export async function authRoutes(fastify, options) {
     fastify.post('/logout', {
         onRequest: [fastify.authenticate]
     }, async (request, reply) => {
-        // In a real application, you might want to invalidate the token
-        // For now, we'll just send a success response
-        reply.send({ message: 'Logged out successfully' });
+        try {
+            // Set user as offline
+            await fastify.db.run(`
+                UPDATE users 
+                SET is_online = 0, last_seen = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            `, request.user.id);
+            
+            // In a real application, you might want to invalidate the token
+            // For now, we'll just send a success response
+            reply.send({ message: 'Logged out successfully' });
+        } catch (error) {
+            fastify.log.error(error);
+            reply.code(500).send({ error: 'Error during logout' });
+        }
     });
 } 

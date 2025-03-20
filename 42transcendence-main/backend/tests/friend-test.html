@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Friend System Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .user-card {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: #4CAF50;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 20px;
+        }
+        .user-info {
+            flex-grow: 1;
+        }
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+            display: inline-block;
+        }
+        .online {
+            background-color: #4CAF50;
+        }
+        .offline {
+            background-color: #ccc;
+        }
+        .user-session {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+        }
+        .user-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .active-session {
+            background-color: #e6f7e6;
+            border-color: #4CAF50;
+        }
+        .session-indicator {
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background-color: #ddd;
+            margin-left: 10px;
+        }
+        .active-indicator {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .columns {
+            display: flex;
+            gap: 20px;
+        }
+        .column {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <h1>Friend System Test</h1>
+    <p>This test page simulates two user sessions to test the friend system functionality.</p>
+    
+    <div class="columns">
+        <div class="column">
+            <div class="user-session" id="user1-session">
+                <div class="user-header">
+                    <h2>User 1</h2>
+                    <span class="session-indicator" id="user1-indicator">Not Registered</span>
+                </div>
+                
+                <div class="test-section">
+                    <h3>Register/Login</h3>
+                    <button id="register-user1">Register User 1</button>
+                    <button id="login-user1" disabled>Login as User 1</button>
+                    <button id="logout-user1" disabled>Logout User 1</button>
+                    <pre id="auth-result-user1"></pre>
+                </div>
+                
+                <div class="test-section">
+                    <h3>Friends Management</h3>
+                    <button id="send-request-to-user2" disabled>Send Request to User 2</button>
+                    <button id="view-friends-user1" disabled>View Friends</button>
+                    <button id="view-pending-requests-user1" disabled>View Pending Requests</button>
+                    <pre id="friends-result-user1"></pre>
+                </div>
+                
+                <div class="test-section">
+                    <h3>Friend Requests</h3>
+                    <button id="accept-request-user1" disabled>Accept Request from User 2</button>
+                    <button id="reject-request-user1" disabled>Reject Request from User 2</button>
+                    <pre id="request-result-user1"></pre>
+                </div>
+            </div>
+        </div>
+        
+        <div class="column">
+            <div class="user-session" id="user2-session">
+                <div class="user-header">
+                    <h2>User 2</h2>
+                    <span class="session-indicator" id="user2-indicator">Not Registered</span>
+                </div>
+                
+                <div class="test-section">
+                    <h3>Register/Login</h3>
+                    <button id="register-user2">Register User 2</button>
+                    <button id="login-user2" disabled>Login as User 2</button>
+                    <button id="logout-user2" disabled>Logout User 2</button>
+                    <pre id="auth-result-user2"></pre>
+                </div>
+                
+                <div class="test-section">
+                    <h3>Friends Management</h3>
+                    <button id="send-request-to-user1" disabled>Send Request to User 1</button>
+                    <button id="view-friends-user2" disabled>View Friends</button>
+                    <button id="view-pending-requests-user2" disabled>View Pending Requests</button>
+                    <pre id="friends-result-user2"></pre>
+                </div>
+                
+                <div class="test-section">
+                    <h3>Friend Requests</h3>
+                    <button id="accept-request-user2" disabled>Accept Request from User 1</button>
+                    <button id="reject-request-user2" disabled>Reject Request from User 1</button>
+                    <pre id="request-result-user2"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Online Status</h2>
+        <button id="check-status-user1" disabled>Check User 1's Status</button>
+        <button id="check-status-user2" disabled>Check User 2's Status</button>
+        <pre id="status-result"></pre>
+    </div>
+    
+    <script>
+        const API_URL = 'http://localhost:4002';
+        let user1 = { username: 'testuser1_' + Date.now(), token: null, id: null };
+        let user2 = { username: 'testuser2_' + Date.now(), token: null, id: null };
+        
+        // Helper function to update button states
+        function updateButtonStates() {
+            // User 1 buttons
+            document.getElementById('login-user1').disabled = !user1.username || user1.token;
+            document.getElementById('logout-user1').disabled = !user1.token;
+            document.getElementById('send-request-to-user2').disabled = !user1.token || !user2.id;
+            document.getElementById('view-friends-user1').disabled = !user1.token;
+            document.getElementById('view-pending-requests-user1').disabled = !user1.token;
+            document.getElementById('accept-request-user1').disabled = !user1.token;
+            document.getElementById('reject-request-user1').disabled = !user1.token;
+            document.getElementById('check-status-user1').disabled = !user1.id;
+            
+            // User 2 buttons
+            document.getElementById('login-user2').disabled = !user2.username || user2.token;
+            document.getElementById('logout-user2').disabled = !user2.token;
+            document.getElementById('send-request-to-user1').disabled = !user2.token || !user1.id;
+            document.getElementById('view-friends-user2').disabled = !user2.token;
+            document.getElementById('view-pending-requests-user2').disabled = !user2.token;
+            document.getElementById('accept-request-user2').disabled = !user2.token;
+            document.getElementById('reject-request-user2').disabled = !user2.token;
+            document.getElementById('check-status-user2').disabled = !user2.id;
+            
+            // Update status indicators
+            updateStatusIndicators();
+        }
+        
+        function updateStatusIndicators() {
+            const user1Indicator = document.getElementById('user1-indicator');
+            const user2Indicator = document.getElementById('user2-indicator');
+            
+            if (user1.token) {
+                user1Indicator.textContent = 'Logged In';
+                user1Indicator.classList.add('active-indicator');
+                document.getElementById('user1-session').classList.add('active-session');
+            } else if (user1.id) {
+                user1Indicator.textContent = 'Registered';
+                user1Indicator.classList.remove('active-indicator');
+                document.getElementById('user1-session').classList.remove('active-session');
+            } else {
+                user1Indicator.textContent = 'Not Registered';
+                user1Indicator.classList.remove('active-indicator');
+                document.getElementById('user1-session').classList.remove('active-session');
+            }
+            
+            if (user2.token) {
+                user2Indicator.textContent = 'Logged In';
+                user2Indicator.classList.add('active-indicator');
+                document.getElementById('user2-session').classList.add('active-session');
+            } else if (user2.id) {
+                user2Indicator.textContent = 'Registered';
+                user2Indicator.classList.remove('active-indicator');
+                document.getElementById('user2-session').classList.remove('active-session');
+            } else {
+                user2Indicator.textContent = 'Not Registered';
+                user2Indicator.classList.remove('active-indicator');
+                document.getElementById('user2-session').classList.remove('active-session');
+            }
+        }
+        
+        // Register User 1
+        document.getElementById('register-user1').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: user1.username,
+                        email: `${user1.username}@example.com`,
+                        password: 'password123'
+                    })
+                });
+                const data = await response.json();
+                if (data.token) {
+                    user1.token = data.token;
+                    user1.id = data.user.id;
+                    document.getElementById('auth-result-user1').textContent = `User 1 registered: ${user1.username} (ID: ${user1.id})`;
+                } else {
+                    document.getElementById('auth-result-user1').textContent = JSON.stringify(data, null, 2);
+                }
+                updateButtonStates();
+            } catch (error) {
+                document.getElementById('auth-result-user1').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Register User 2
+        document.getElementById('register-user2').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: user2.username,
+                        email: `${user2.username}@example.com`,
+                        password: 'password123'
+                    })
+                });
+                const data = await response.json();
+                if (data.token) {
+                    user2.token = data.token;
+                    user2.id = data.user.id;
+                    document.getElementById('auth-result-user2').textContent = `User 2 registered: ${user2.username} (ID: ${user2.id})`;
+                } else {
+                    document.getElementById('auth-result-user2').textContent = JSON.stringify(data, null, 2);
+                }
+                updateButtonStates();
+            } catch (error) {
+                document.getElementById('auth-result-user2').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Login User 1
+        document.getElementById('login-user1').addEventListener('click', async () => {
+            try {
+                // If we're already logged in as user2, log them out first
+                if (user2.token) {
+                    user2.token = null;
+                    document.getElementById('auth-result-user2').textContent += '\nLogged out to switch to User 1';
+                }
+                
+                const response = await fetch(`${API_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: user1.username,
+                        password: 'password123'
+                    })
+                });
+                const data = await response.json();
+                if (data.token) {
+                    user1.token = data.token;
+                    document.getElementById('auth-result-user1').textContent = `User 1 logged in: ${user1.username}`;
+                } else {
+                    document.getElementById('auth-result-user1').textContent = JSON.stringify(data, null, 2);
+                }
+                updateButtonStates();
+            } catch (error) {
+                document.getElementById('auth-result-user1').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Login User 2
+        document.getElementById('login-user2').addEventListener('click', async () => {
+            try {
+                // If we're already logged in as user1, log them out first
+                if (user1.token) {
+                    user1.token = null;
+                    document.getElementById('auth-result-user1').textContent += '\nLogged out to switch to User 2';
+                }
+                
+                const response = await fetch(`${API_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: user2.username,
+                        password: 'password123'
+                    })
+                });
+                const data = await response.json();
+                if (data.token) {
+                    user2.token = data.token;
+                    document.getElementById('auth-result-user2').textContent = `User 2 logged in: ${user2.username}`;
+                } else {
+                    document.getElementById('auth-result-user2').textContent = JSON.stringify(data, null, 2);
+                }
+                updateButtonStates();
+            } catch (error) {
+                document.getElementById('auth-result-user2').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Send friend request from User 1 to User 2
+        document.getElementById('send-request-to-user2').addEventListener('click', async () => {
+            try {
+                if (!user1.token || !user2.id) {
+                    document.getElementById('friends-result-user1').textContent = 'Error: Both users must be registered';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/friends/${user2.id}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${user1.token}` }
+                });
+                
+                const data = await response.json();
+                document.getElementById('friends-result-user1').textContent = `Request sent to User 2:\n${JSON.stringify(data, null, 2)}`;
+                
+                // Enable buttons for accepting/rejecting the request
+                document.getElementById('accept-request-user2').disabled = false;
+                document.getElementById('reject-request-user2').disabled = false;
+            } catch (error) {
+                document.getElementById('friends-result-user1').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Send friend request from User 2 to User 1
+        document.getElementById('send-request-to-user1').addEventListener('click', async () => {
+            try {
+                if (!user2.token || !user1.id) {
+                    document.getElementById('friends-result-user2').textContent = 'Error: Both users must be registered';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/friends/${user1.id}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${user2.token}` }
+                });
+                
+                const data = await response.json();
+                document.getElementById('friends-result-user2').textContent = `Request sent to User 1:\n${JSON.stringify(data, null, 2)}`;
+                
+                // Enable buttons for accepting/rejecting the request
+                document.getElementById('accept-request-user1').disabled = false;
+                document.getElementById('reject-request-user1').disabled = false;
+            } catch (error) {
+                document.getElementById('friends-result-user2').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Accept friend request as User 1
+        document.getElementById('accept-request-user1').addEventListener('click', async () => {
+            try {
+                if (!user1.token) {
+                    document.getElementById('request-result-user1').textContent = 'Error: User 1 must be logged in to accept requests';
+                    return;
+                }
+                
+                if (!user2.id) {
+                    document.getElementById('request-result-user1').textContent = 'Error: User 2 must be registered to accept their request';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/friends/${user2.id}/accept`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${user1.token}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('request-result-user1').textContent = `Friend request from User 2 accepted:\n${JSON.stringify(data, null, 2)}`;
+                    
+                    // Refresh friend lists
+                    document.getElementById('view-friends-user1').click();
+                } else {
+                    const error = await response.json();
+                    document.getElementById('request-result-user1').textContent = `Error: ${JSON.stringify(error, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('request-result-user1').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Reject friend request as User 1
+        document.getElementById('reject-request-user1').addEventListener('click', async () => {
+            try {
+                if (!user1.token) {
+                    document.getElementById('request-result-user1').textContent = 'Error: User 1 must be logged in to reject requests';
+                    return;
+                }
+                
+                if (!user2.id) {
+                    document.getElementById('request-result-user1').textContent = 'Error: User 2 must be registered to reject their request';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/friends/${user2.id}/reject`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${user1.token}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('request-result-user1').textContent = `Friend request from User 2 rejected:\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    const error = await response.json();
+                    document.getElementById('request-result-user1').textContent = `Error: ${JSON.stringify(error, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('request-result-user1').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Accept friend request as User 2
+        document.getElementById('accept-request-user2').addEventListener('click', async () => {
+            try {
+                if (!user2.token) {
+                    document.getElementById('request-result-user2').textContent = 'Error: User 2 must be logged in to accept requests';
+                    return;
+                }
+                
+                if (!user1.id) {
+                    document.getElementById('request-result-user2').textContent = 'Error: User 1 must be registered to accept their request';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/friends/${user1.id}/accept`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${user2.token}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('request-result-user2').textContent = `Friend request from User 1 accepted:\n${JSON.stringify(data, null, 2)}`;
+                    
+                    // Refresh friend lists
+                    document.getElementById('view-friends-user2').click();
+                } else {
+                    const error = await response.json();
+                    document.getElementById('request-result-user2').textContent = `Error: ${JSON.stringify(error, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('request-result-user2').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Reject friend request as User 2
+        document.getElementById('reject-request-user2').addEventListener('click', async () => {
+            try {
+                if (!user2.token) {
+                    document.getElementById('request-result-user2').textContent = 'Error: User 2 must be logged in to reject requests';
+                    return;
+                }
+                
+                if (!user1.id) {
+                    document.getElementById('request-result-user2').textContent = 'Error: User 1 must be registered to reject their request';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/friends/${user1.id}/reject`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${user2.token}` }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('request-result-user2').textContent = `Friend request from User 1 rejected:\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    const error = await response.json();
+                    document.getElementById('request-result-user2').textContent = `Error: ${JSON.stringify(error, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('request-result-user2').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // View User 1's friends
+        document.getElementById('view-friends-user1').addEventListener('click', async () => {
+            try {
+                if (!user1.token) {
+                    document.getElementById('friends-result-user1').textContent = 'Error: User 1 must be logged in';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/friends`, {
+                    headers: { 'Authorization': `Bearer ${user1.token}` }
+                });
+                
+                if (response.ok) {
+                    const friends = await response.json();
+                    document.getElementById('friends-result-user1').textContent = `User 1's Friends (${friends.length}):\n${JSON.stringify(friends, null, 2)}`;
+                } else {
+                    const error = await response.json();
+                    document.getElementById('friends-result-user1').textContent = `Error: ${JSON.stringify(error, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('friends-result-user1').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // View User 2's friends
+        document.getElementById('view-friends-user2').addEventListener('click', async () => {
+            try {
+                if (!user2.token) {
+                    document.getElementById('friends-result-user2').textContent = 'Error: User 2 must be logged in';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/friends`, {
+                    headers: { 'Authorization': `Bearer ${user2.token}` }
+                });
+                
+                if (response.ok) {
+                    const friends = await response.json();
+                    document.getElementById('friends-result-user2').textContent = `User 2's Friends (${friends.length}):\n${JSON.stringify(friends, null, 2)}`;
+                } else {
+                    const error = await response.json();
+                    document.getElementById('friends-result-user2').textContent = `Error: ${JSON.stringify(error, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('friends-result-user2').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // View User 1's pending requests
+        document.getElementById('view-pending-requests-user1').addEventListener('click', async () => {
+            try {
+                if (!user1.token) {
+                    document.getElementById('friends-result-user1').textContent = 'Error: User 1 must be logged in';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/friends/pending`, {
+                    headers: { 'Authorization': `Bearer ${user1.token}` }
+                });
+                
+                if (response.ok) {
+                    const requests = await response.json();
+                    document.getElementById('friends-result-user1').textContent = `User 1's Pending Requests (${requests.length}):\n${JSON.stringify(requests, null, 2)}`;
+                    
+                    // Enable accept/reject buttons if there are requests
+                    if (requests.length > 0) {
+                        document.getElementById('accept-request-user1').disabled = false;
+                        document.getElementById('reject-request-user1').disabled = false;
+                    }
+                } else {
+                    const error = await response.json();
+                    document.getElementById('friends-result-user1').textContent = `Error: ${JSON.stringify(error, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('friends-result-user1').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // View User 2's pending requests
+        document.getElementById('view-pending-requests-user2').addEventListener('click', async () => {
+            try {
+                if (!user2.token) {
+                    document.getElementById('friends-result-user2').textContent = 'Error: User 2 must be logged in';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/friends/pending`, {
+                    headers: { 'Authorization': `Bearer ${user2.token}` }
+                });
+                
+                if (response.ok) {
+                    const requests = await response.json();
+                    document.getElementById('friends-result-user2').textContent = `User 2's Pending Requests (${requests.length}):\n${JSON.stringify(requests, null, 2)}`;
+                    
+                    // Enable accept/reject buttons if there are requests
+                    if (requests.length > 0) {
+                        document.getElementById('accept-request-user2').disabled = false;
+                        document.getElementById('reject-request-user2').disabled = false;
+                    }
+                } else {
+                    const error = await response.json();
+                    document.getElementById('friends-result-user2').textContent = `Error: ${JSON.stringify(error, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('friends-result-user2').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Check User 1's status
+        document.getElementById('check-status-user1').addEventListener('click', async () => {
+            try {
+                if (!user1.id) {
+                    document.getElementById('status-result').textContent = 'Error: User 1 must be registered';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/users/${user1.id}/status`);
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    // Convert to Singapore time by adding 8 hours to UTC
+                    const lastSeenUTC = new Date(userData.last_seen);
+                    // Create a new date with 8 hours added (SGT is UTC+8)
+                    const lastSeenSGT = new Date(lastSeenUTC.getTime() + (8 * 60 * 60 * 1000));
+                    // Format date
+                    const dateOptions = { 
+                        year: 'numeric', 
+                        month: '2-digit', 
+                        day: '2-digit',
+                        hour: '2-digit', 
+                        minute: '2-digit', 
+                        second: '2-digit',
+                        hour12: true
+                    };
+                    
+                    document.getElementById('status-result').textContent = `
+User 1 status:
+Username: ${userData.username}
+Is Online: ${userData.is_online ? 'Yes' : 'No'}
+Last Seen: ${lastSeenSGT.toLocaleString('en-SG', dateOptions)} (SGT)
+                    `;
+                } else {
+                    const error = await response.json();
+                    document.getElementById('status-result').textContent = `Error: ${JSON.stringify(error, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('status-result').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Check User 2's status
+        document.getElementById('check-status-user2').addEventListener('click', async () => {
+            try {
+                if (!user2.id) {
+                    document.getElementById('status-result').textContent = 'Error: User 2 must be registered';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/users/${user2.id}/status`);
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    // Convert to Singapore time by adding 8 hours to UTC
+                    const lastSeenUTC = new Date(userData.last_seen);
+                    // Create a new date with 8 hours added (SGT is UTC+8)
+                    const lastSeenSGT = new Date(lastSeenUTC.getTime() + (8 * 60 * 60 * 1000));
+                    // Format date
+                    const dateOptions = { 
+                        year: 'numeric', 
+                        month: '2-digit', 
+                        day: '2-digit',
+                        hour: '2-digit', 
+                        minute: '2-digit', 
+                        second: '2-digit',
+                        hour12: true
+                    };
+                    
+                    document.getElementById('status-result').textContent = `
+User 2 status:
+Username: ${userData.username}
+Is Online: ${userData.is_online ? 'Yes' : 'No'}
+Last Seen: ${lastSeenSGT.toLocaleString('en-SG', dateOptions)} (SGT)
+                    `;
+                } else {
+                    const error = await response.json();
+                    document.getElementById('status-result').textContent = `Error: ${JSON.stringify(error, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('status-result').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Logout User 1
+        document.getElementById('logout-user1').addEventListener('click', async () => {
+            try {
+                if (!user1.token) {
+                    document.getElementById('auth-result-user1').textContent = 'Error: User 1 is not logged in';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/auth/logout`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${user1.token}` }
+                });
+                
+                if (response.ok) {
+                    user1.token = null;
+                    document.getElementById('auth-result-user1').textContent = 'User 1 logged out successfully';
+                    updateButtonStates();
+                } else {
+                    const error = await response.json();
+                    document.getElementById('auth-result-user1').textContent = `Error: ${JSON.stringify(error, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('auth-result-user1').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Logout User 2
+        document.getElementById('logout-user2').addEventListener('click', async () => {
+            try {
+                if (!user2.token) {
+                    document.getElementById('auth-result-user2').textContent = 'Error: User 2 is not logged in';
+                    return;
+                }
+                
+                const response = await fetch(`${API_URL}/api/auth/logout`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${user2.token}` }
+                });
+                
+                if (response.ok) {
+                    user2.token = null;
+                    document.getElementById('auth-result-user2').textContent = 'User 2 logged out successfully';
+                    updateButtonStates();
+                } else {
+                    const error = await response.json();
+                    document.getElementById('auth-result-user2').textContent = `Error: ${JSON.stringify(error, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('auth-result-user2').textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        // Initialize button states
+        updateButtonStates();
+    </script>
+</body>
+</html> 

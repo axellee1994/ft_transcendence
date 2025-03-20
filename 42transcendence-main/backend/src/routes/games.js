@@ -15,6 +15,29 @@ export async function gameRoutes(fastify, options) {
         }
     };
 
+    // Get all games
+    fastify.get('/', {
+        schema: {
+            response: {
+                200: {
+                    type: 'array',
+                    items: gameSchema
+                }
+            }
+        }
+    }, async (request, reply) => {
+        try {
+            const games = await fastify.db.all(`
+                SELECT * FROM games 
+                ORDER BY created_at DESC
+            `);
+            return games;
+        } catch (err) {
+            fastify.log.error(err);
+            reply.code(500).send({ error: 'Internal Server Error' });
+        }
+    });
+
     // Create new game
     fastify.post('/', {
         schema: {
@@ -32,17 +55,22 @@ export async function gameRoutes(fastify, options) {
             }
         }
     }, async (request, reply) => {
-        const game = await fastify.db('games')
-            .insert({
-                ...request.body,
-                status: 'pending',
-                created_at: new Date(),
-                updated_at: new Date()
-            })
-            .returning('*');
-        
-        reply.code(201);
-        return game;
+        try {
+            const result = await fastify.db.run(`
+                INSERT INTO games (player1_id, player2_id, game_type, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            `, [request.body.player1_id, request.body.player2_id, request.body.game_type, 'pending']);
+            
+            const game = await fastify.db.get(`
+                SELECT * FROM games WHERE id = ?
+            `, result.lastID);
+            
+            reply.code(201);
+            return game;
+        } catch (err) {
+            fastify.log.error(err);
+            reply.code(500).send({ error: 'Internal Server Error' });
+        }
     });
 
     // Get game by ID
@@ -59,15 +87,22 @@ export async function gameRoutes(fastify, options) {
             }
         }
     }, async (request, reply) => {
-        const { id } = request.params;
-        const game = await fastify.db('games').where({ id }).first();
-        
-        if (!game) {
-            reply.code(404).send({ error: 'Game not found' });
-            return;
+        try {
+            const { id } = request.params;
+            const game = await fastify.db.get(`
+                SELECT * FROM games WHERE id = ?
+            `, id);
+            
+            if (!game) {
+                reply.code(404).send({ error: 'Game not found' });
+                return;
+            }
+            
+            return game;
+        } catch (err) {
+            fastify.log.error(err);
+            reply.code(500).send({ error: 'Internal Server Error' });
         }
-        
-        return game;
     });
 
     // Update game state
@@ -93,36 +128,48 @@ export async function gameRoutes(fastify, options) {
             }
         }
     }, async (request, reply) => {
-        const { id } = request.params;
-        const updates = request.body;
-        
-        const game = await fastify.db('games')
-            .where({ id })
-            .update({ ...updates, updated_at: new Date() })
-            .returning('*');
-        
-        if (!game) {
-            reply.code(404).send({ error: 'Game not found' });
-            return;
-        }
+        try {
+            const { id } = request.params;
+            const updates = request.body;
+            
+            await fastify.db.run(`
+                UPDATE games 
+                SET player1_score = ?, player2_score = ?, status = ?, winner_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `, [updates.player1_score, updates.player2_score, updates.status, updates.winner_id, id]);
+            
+            const game = await fastify.db.get(`
+                SELECT * FROM games WHERE id = ?
+            `, id);
+            
+            if (!game) {
+                reply.code(404).send({ error: 'Game not found' });
+                return;
+            }
 
-        // If game is completed, update player stats
-        if (updates.status === 'completed' && updates.winner_id) {
-            const game = await fastify.db('games').where({ id }).first();
+            // If game is completed, update player stats
+            if (updates.status === 'completed' && updates.winner_id) {
+                // Update winner stats
+                await fastify.db.run(`
+                    UPDATE users 
+                    SET wins = wins + 1 
+                    WHERE id = ?
+                `, updates.winner_id);
+                
+                // Update loser stats
+                const loserId = game.player1_id === updates.winner_id ? game.player2_id : game.player1_id;
+                await fastify.db.run(`
+                    UPDATE users 
+                    SET losses = losses + 1 
+                    WHERE id = ?
+                `, loserId);
+            }
             
-            // Update winner stats
-            await fastify.db('users')
-                .where({ id: updates.winner_id })
-                .increment('wins', 1);
-            
-            // Update loser stats
-            const loserId = game.player1_id === updates.winner_id ? game.player2_id : game.player1_id;
-            await fastify.db('users')
-                .where({ id: loserId })
-                .increment('losses', 1);
+            return game;
+        } catch (err) {
+            fastify.log.error(err);
+            reply.code(500).send({ error: 'Internal Server Error' });
         }
-        
-        return game;
     });
 
     // Get active games
@@ -136,11 +183,18 @@ export async function gameRoutes(fastify, options) {
             }
         }
     }, async (request, reply) => {
-        const games = await fastify.db('games')
-            .where({ status: 'active' })
-            .orderBy('created_at', 'desc');
-        
-        return games;
+        try {
+            const games = await fastify.db.all(`
+                SELECT * FROM games 
+                WHERE status = 'active' 
+                ORDER BY created_at DESC
+            `);
+            
+            return games;
+        } catch (err) {
+            fastify.log.error(err);
+            reply.code(500).send({ error: 'Internal Server Error' });
+        }
     });
 
     // WebSocket endpoint for real-time game updates
@@ -152,13 +206,11 @@ export async function gameRoutes(fastify, options) {
                 const update = JSON.parse(message);
                 
                 // Update game state in database
-                await fastify.db('games')
-                    .where({ id })
-                    .update({
-                        player1_score: update.player1_score,
-                        player2_score: update.player2_score,
-                        updated_at: new Date()
-                    });
+                await fastify.db.run(`
+                    UPDATE games 
+                    SET player1_score = ?, player2_score = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                `, [update.player1_score, update.player2_score, id]);
                 
                 // Broadcast update to all connected clients
                 connection.socket.send(JSON.stringify(update));

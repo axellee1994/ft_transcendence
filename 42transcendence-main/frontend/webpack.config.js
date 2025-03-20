@@ -2,11 +2,7 @@ const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
-  entry: {
-    index: './src/index.ts',
-    singlePlayer: './src/single-player.ts',
-    multiPlayer: './src/multi-player.ts'
-  },
+  entry: './src/index.ts',
   mode: 'development',
   devtool: 'inline-source-map',
   module: {
@@ -15,10 +11,6 @@ module.exports = {
         test: /\.tsx?$/,
         use: 'ts-loader',
         exclude: /node_modules/
-      },
-      {
-        test: /\.(glb|gltf)$/,
-        type: 'asset/resource'
       },
       {
         test: /\.css$/,
@@ -31,10 +23,13 @@ module.exports = {
     ]
   },
   resolve: {
-    extensions: ['.ts', '.js']
+    extensions: ['.tsx', '.ts', '.js'],
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    }
   },
   output: {
-    filename: '[name].bundle.js',
+    filename: '[name].[contenthash].js',
     path: path.resolve(__dirname, 'dist'),
     clean: true,
     publicPath: '/'
@@ -43,59 +38,27 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: './src/index.html',
       filename: 'index.html',
-      chunks: ['index'],
-      cache: false
-    }),
-    new HtmlWebpackPlugin({
-      template: './src/single-player.html',
-      filename: 'single-player.html',
-      chunks: ['singlePlayer'],
-      cache: false
-    }),
-    new HtmlWebpackPlugin({
-      template: './src/multi-player.html',
-      filename: 'multi-player.html',
-      chunks: ['multiPlayer'],
+      inject: true,
       cache: false
     })
   ],
   devServer: {
     static: {
       directory: path.join(__dirname, 'dist'),
-      publicPath: '/',
-      watch: true
+      publicPath: '/'
     },
     port: 4000,
     host: '0.0.0.0',
-    hot: false,
-    liveReload: true,
+    hot: true,
     historyApiFallback: true,
     devMiddleware: {
-      writeToDisk: true,
-      index: true,
-      mimeTypes: { 'text/html': ['html'] },
-      publicPath: '/',
-      serverSideRender: true
+      writeToDisk: true
     },
     allowedHosts: 'all',
     client: {
       webSocketURL: 'auto://0.0.0.0:0/ws',
       overlay: true,
       progress: true
-    },
-    watchFiles: ['src/**/*'],
-    setupMiddlewares: (middlewares, devServer) => {
-      if (!devServer) {
-        throw new Error('webpack-dev-server is not defined');
-      }
-      return middlewares;
-    }
-  },
-  optimization: {
-    runtimeChunk: 'single',
-    splitChunks: {
-      chunks: 'all',
-      name: false
     }
   }
 }; 

@@ -1,90 +1,104 @@
 import fp from 'fastify-plugin';
-import knex from 'knex';
+import sqlite3 from 'sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { open } from 'sqlite';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Database setup function
-async function setupDatabase(fastify, options) {
-    const db = knex({
-        client: 'sqlite3',
-        connection: {
-            filename: join(__dirname, '../db/transcendence.sqlite')
-        },
-        useNullAsDefault: true
-    });
+// Create a persistent directory for the database
+const DB_DIR = join(__dirname, '../db');
+const DB_PATH = join(DB_DIR, 'transcendence.db');
 
-    // Test the connection
+// Ensure the directory exists
+if (!fs.existsSync(DB_DIR)) {
+    fs.mkdirSync(DB_DIR, { recursive: true });
+}
+
+// Database setup function
+async function dbConnector(fastify, options) {
     try {
-        await db.raw('SELECT 1');
-        fastify.log.info('Database connected successfully');
+        fastify.log.info(`Opening SQLite database at: ${DB_PATH}`);
+        
+        const db = await open({
+            filename: DB_PATH,
+            driver: sqlite3.Database
+        });
+        
+        // Create tables if they don't exist
+        await db.exec(`
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                display_name TEXT,
+                avatar_url TEXT,
+                wins INTEGER DEFAULT 0,
+                losses INTEGER DEFAULT 0,
+                is_online BOOLEAN DEFAULT 0,
+                last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS game_settings (
+                user_id INTEGER PRIMARY KEY,
+                difficulty TEXT DEFAULT 'medium',
+                game_speed INTEGER DEFAULT 1,
+                invert_controls BOOLEAN DEFAULT 0,
+                enable_sound BOOLEAN DEFAULT 1,
+                enable_music BOOLEAN DEFAULT 1,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS games (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                player1_id INTEGER NOT NULL,
+                player2_id INTEGER NOT NULL,
+                player1_score INTEGER DEFAULT 0,
+                player2_score INTEGER DEFAULT 0,
+                winner_id INTEGER,
+                game_mode TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (player1_id) REFERENCES users(id),
+                FOREIGN KEY (player2_id) REFERENCES users(id),
+                FOREIGN KEY (winner_id) REFERENCES users(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS friendships (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                friend_id INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (friend_id) REFERENCES users(id),
+                UNIQUE(user_id, friend_id)
+            );
+        `);
+        
+        // Test the database connection with a simple query
+        const testResult = await db.get('SELECT sqlite_version() as version');
+        fastify.log.info(`Connected to SQLite version: ${testResult.version}`);
+        
+        // Decorate Fastify instance with our db
+        fastify.decorate('db', db);
+
+        // Close database connection when Fastify closes
+        fastify.addHook('onClose', async (instance) => {
+            await instance.db.close();
+        });
+
     } catch (err) {
-        fastify.log.error('Database connection failed:', err);
+        console.error('Error setting up database:', err);
         throw err;
     }
-
-    // Initialize database schema
-    await initializeDatabase(db);
-
-    // Make the database connection available through fastify
-    fastify.decorate('db', db);
 }
 
-async function initializeDatabase(db) {
-    // Users table
-    if (!await db.schema.hasTable('users')) {
-        await db.schema.createTable('users', table => {
-            table.increments('id').primary();
-            table.string('username').unique().notNullable();
-            table.string('display_name');
-            table.string('email').unique();
-            table.string('password_hash');
-            table.string('avatar_url');
-            table.integer('wins').defaultTo(0);
-            table.integer('losses').defaultTo(0);
-            table.timestamps(true, true);
-        });
-    }
-
-    // Games table
-    if (!await db.schema.hasTable('games')) {
-        await db.schema.createTable('games', table => {
-            table.increments('id').primary();
-            table.integer('player1_id').references('id').inTable('users');
-            table.integer('player2_id').references('id').inTable('users');
-            table.integer('winner_id').references('id').inTable('users');
-            table.integer('player1_score').defaultTo(0);
-            table.integer('player2_score').defaultTo(0);
-            table.string('game_type').notNullable(); // 'single' or 'multi'
-            table.string('status').defaultTo('pending'); // 'pending', 'active', 'completed'
-            table.timestamps(true, true);
-        });
-    }
-
-    // Tournaments table
-    if (!await db.schema.hasTable('tournaments')) {
-        await db.schema.createTable('tournaments', table => {
-            table.increments('id').primary();
-            table.string('name').notNullable();
-            table.string('status').defaultTo('pending'); // 'pending', 'active', 'completed'
-            table.integer('winner_id').references('id').inTable('users');
-            table.timestamps(true, true);
-        });
-    }
-
-    // Tournament Participants table
-    if (!await db.schema.hasTable('tournament_participants')) {
-        await db.schema.createTable('tournament_participants', table => {
-            table.increments('id').primary();
-            table.integer('tournament_id').references('id').inTable('tournaments');
-            table.integer('user_id').references('id').inTable('users');
-            table.timestamps(true, true);
-        });
-    }
-}
-
-export const dbConnector = fp(setupDatabase, {
-    name: 'dbConnector'
+export const db = fp(dbConnector, {
+    name: 'db'
 }); 

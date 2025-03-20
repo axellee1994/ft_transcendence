@@ -10,34 +10,30 @@ function cleanupGame() {
     currentGame = null;
 }
 
-export function renderGamePage(container: HTMLElement, mode: 'single' | 'multi' = 'single'): void {
+export function renderGamePage(container: HTMLElement): void {
+    // Get the game mode from window object
+    const mode = (window as any).gameMode || 'single';
+
     // Cleanup any existing game
     cleanupGame();
 
     container.innerHTML = `
         <div class="min-h-screen bg-gray-50">
-            <nav class="bg-white shadow-md">
-                <div class="container-game flex justify-between items-center py-4">
-                    <h1 class="text-2xl font-bold text-gray-800">42 Transcendence</h1>
-                    <div class="space-x-4">
-                        <button onclick="navigate('/')" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition duration-200">
-                            Back to Menu
-                        </button>
-                    </div>
-                </div>
-            </nav>
-            
             <div class="container-game py-8">
                 <div class="bg-white rounded-lg shadow-xl p-6 max-w-4xl mx-auto">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-4">${mode === 'single' ? 'Single View' : 'Multi View'} Mode</h2>
+                    <div class="text-center mb-4">
+                        <h2 class="text-2xl font-bold text-gray-800">${mode === 'single' ? 'Single View' : 'Multi View'} Mode</h2>
+                    </div>
                     <div class="bg-gray-900 rounded-lg shadow-lg overflow-hidden">
                         <canvas id="renderCanvas" class="w-full aspect-video touch-none"></canvas>
                     </div>
-                    <div class="mt-4 flex justify-between items-center">
-                        <div class="text-gray-700">
-                            <span class="font-bold">Score:</span> <span id="score">0 - 0</span>
+                    <div class="mt-4 flex justify-center items-center">
+                        <div class="text-gray-700 text-xl font-bold">
+                            <span id="score">0 - 0</span>
                         </div>
-                        <button onclick="navigate('/')" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition duration-200">
+                    </div>
+                    <div class="mt-4 flex justify-center">
+                        <button onclick="navigate('/')" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg transition duration-200">
                             End Game
                         </button>
                     </div>
@@ -46,8 +42,14 @@ export function renderGamePage(container: HTMLElement, mode: 'single' | 'multi' 
         </div>
     `;
 
-    // Initialize the appropriate game mode
+    // Initialize the game with the appropriate mode
     const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
+    if (canvas) {
+        initializeGame(canvas, mode);
+    }
+}
+
+function initializeGame(canvas: HTMLCanvasElement, mode: 'single' | 'multi') {
     if (mode === 'single') {
         currentGame = new Pong('renderCanvas');
     } else {
