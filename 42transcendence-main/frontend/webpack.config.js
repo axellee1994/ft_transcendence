@@ -1,15 +1,43 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const fs = require('fs');
+
+// Custom plugin to remove unwanted script tags
+class RemoveIndexTsScriptPlugin {
+  apply(compiler) {
+    compiler.hooks.afterEmit.tap('RemoveIndexTsScriptPlugin', (compilation) => {
+      const outputPath = compilation.outputOptions.path;
+      const indexFile = path.join(outputPath, 'index.html');
+      
+      if (fs.existsSync(indexFile)) {
+        let htmlContent = fs.readFileSync(indexFile, 'utf8');
+        // Remove any script tag referencing index.ts
+        htmlContent = htmlContent.replace(/<script[^>]*src="index.ts"[^>]*><\/script>/g, '');
+        fs.writeFileSync(indexFile, htmlContent);
+      }
+    });
+  }
+}
 
 module.exports = {
-  entry: './src/index.ts',
+  entry: {
+    app: './src/index.ts'
+  },
   mode: 'development',
   devtool: 'inline-source-map',
   module: {
     rules: [
       {
         test: /\.tsx?$/,
-        use: 'ts-loader',
+        use: [
+          {
+            loader: 'ts-loader',
+            options: {
+              // Skip type checking for faster builds
+              transpileOnly: true
+            }
+          }
+        ],
         exclude: /node_modules/
       },
       {
@@ -38,9 +66,11 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: './src/index.html',
       filename: 'index.html',
-      inject: true,
-      cache: false
-    })
+      inject: 'body',
+      cache: false,
+      scriptLoading: 'blocking'
+    }),
+    new RemoveIndexTsScriptPlugin()
   ],
   devServer: {
     static: {
@@ -59,6 +89,7 @@ module.exports = {
       webSocketURL: 'auto://0.0.0.0:0/ws',
       overlay: true,
       progress: true
-    }
+    },
+    liveReload: true
   }
 }; 

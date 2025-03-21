@@ -1,4 +1,4 @@
-import { AuthService } from '../services/auth';
+import { AuthService, API_URL } from '../services/auth';
 import { AuthModal } from './AuthModal';
 
 export class Navigation {
@@ -13,13 +13,15 @@ export class Navigation {
         
         // Listen for auth state changes from custom events
         document.addEventListener('auth-state-changed', (event: Event) => {
-            console.log('Navigation: Received auth-state-changed event', event);
-            // Get the custom event detail if available
+            console.log('🔍 DEBUG: Navigation - Received auth-state-changed event:', event);
             const customEvent = event as CustomEvent;
-            const eventDetail = customEvent.detail || { authenticated: true };
+            const eventDetail = customEvent.detail || {};
             
-            // Check if specific fields were updated
+            // Get updated fields if any were specified
             const updatedFields = eventDetail.updatedFields || [];
+            console.log('🔍 DEBUG: Navigation - Auth state change with fields:', updatedFields);
+            
+            // Update only specific fields or all auth state if no fields specified
             this.updateAuthState(updatedFields);
         });
     }
@@ -44,7 +46,7 @@ export class Navigation {
                         <div class="flex items-center space-x-4">
                             <div class="user-info hidden flex items-center space-x-4">
                                 <a href="/profile" class="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 rounded-lg px-3 py-2 transition-colors">
-                                    <div class="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center">
+                                    <div class="user-avatar h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center overflow-hidden">
                                         <span class="avatar-initial text-white font-medium text-sm"></span>
                                     </div>
                                     <div class="flex flex-col">
@@ -87,8 +89,12 @@ export class Navigation {
                 await this.authService.logout();
                 this.updateAuthState();
                 console.log('Auth state updated after logout');
-                // Force a page reload to ensure we're in a clean state
-                window.location.href = '/';
+                // Use router navigation if available
+                if ((window as any).navigate) {
+                    (window as any).navigate('/');
+                } else {
+                    window.location.href = '/';
+                }
             });
         }
 
@@ -97,36 +103,74 @@ export class Navigation {
     }
 
     public updateAuthState(updatedFields: string[] = []): void {
-        console.log('Navigation: updateAuthState called with fields:', updatedFields);
+        console.log('🔍 DEBUG: Navigation - updateAuthState called with fields:', updatedFields);
         
-        // Force re-fetch of the current user data
-        const isAuthenticated = this.authService.isAuthenticated();
-        
-        // Get fresh user data by reading from localStorage
-        let currentUser = this.authService.getCurrentUser();
-        
-        // Try to read directly from localStorage if specific fields have been updated
-        // or if we don't have certain data in the current user
-        if (updatedFields.length > 0 || 
-            (currentUser && (!currentUser.display_name || !currentUser.username || !currentUser.email))) {
+        // Re-fetch user data from localStorage first to ensure we have the latest
+        const userData = localStorage.getItem('user_data');
+        if (userData) {
             try {
-                const storedUserData = localStorage.getItem('user_data');
-                if (storedUserData) {
-                    const parsedUser = JSON.parse(storedUserData);
-                    
-                    // Check if the stored data has more complete information
-                    const shouldUseStored = 
-                        (updatedFields.includes('display_name') && parsedUser.display_name) ||
-                        (updatedFields.includes('username') && parsedUser.username) ||
-                        (updatedFields.includes('email') && parsedUser.email);
-                    
-                    if (shouldUseStored) {
-                        console.log('Navigation: Found updated user data in localStorage:', parsedUser);
-                        currentUser = parsedUser;
+                const parsedData = JSON.parse(userData);
+                
+                // Check if we're specifically updating avatar fields
+                if (updatedFields.includes('avatar_url') && parsedData.avatar_url) {
+                    console.log('🔍 DEBUG: Navigation - Avatar update detected from localStorage:', parsedData.avatar_url);
+                }
+                
+                // Only update the AuthService user data if it exists and we have new data
+                const authService = this.authService;
+                if (authService) {
+                    const currentUser = authService.getCurrentUser();
+                    if (currentUser) {
+                        // Update specific fields that were changed
+                        if (updatedFields.includes('avatar_url') && parsedData.avatar_url) {
+                            currentUser.avatar_url = parsedData.avatar_url;
+                        }
+                        if (updatedFields.includes('username') && parsedData.username) {
+                            currentUser.username = parsedData.username;
+                        }
+                        if (updatedFields.includes('display_name')) {
+                            currentUser.display_name = parsedData.display_name;
+                        }
+                        if (updatedFields.includes('email') && parsedData.email) {
+                            currentUser.email = parsedData.email;
+                        }
                     }
                 }
             } catch (error) {
-                console.error('Navigation: Failed to parse stored user data:', error);
+                console.error('🔍 DEBUG: Navigation - Error parsing user data from localStorage:', error);
+            }
+        }
+        
+        // Check if the user is authenticated
+        const isAuthenticated = this.authService.isAuthenticated();
+        console.log('🔍 DEBUG: Navigation - isAuthenticated =', isAuthenticated);
+        
+        // Get current user info if authenticated
+        let currentUser = null;
+        if (isAuthenticated) {
+            currentUser = this.authService.getCurrentUser();
+            console.log('🔍 DEBUG: Navigation - currentUser:', currentUser);
+            
+            // If only specific fields were requested to be updated, only update those
+            if (updatedFields.length > 0) {
+                console.log('🔍 DEBUG: Navigation - Selectively updating fields:', updatedFields);
+                
+                if (updatedFields.includes('avatar_url')) {
+                    console.log('🔍 DEBUG: Navigation - Avatar update detected, current avatar:', currentUser?.avatar_url);
+                    this.updateUserAvatar(currentUser);
+                    return;
+                }
+                
+                if (updatedFields.includes('username') || 
+                    updatedFields.includes('display_name') || 
+                    updatedFields.includes('email')) {
+                    // These fields all require a full auth state update
+                    console.log('🔍 DEBUG: Navigation - Critical field updated, doing full update');
+                    // Continue with full update below
+                } else if (!updatedFields.includes('avatar_url')) {
+                    console.log('🔍 DEBUG: Navigation - No critical fields updated, skipping');
+                    return;
+                }
             }
         }
         
@@ -139,7 +183,6 @@ export class Navigation {
         const loginButton = this.container.querySelector('.login-button');
         const usernameSpan = this.container.querySelector('.username');
         const userEmailSpan = this.container.querySelector('.user-email');
-        const avatarInitial = this.container.querySelector('.avatar-initial');
 
         if (userOnlyElements) {
             console.log('Navigation: updating userOnlyElements visibility');
@@ -158,7 +201,7 @@ export class Navigation {
             loginButton.classList.toggle('hidden', isAuthenticated);
         }
 
-        if (currentUser && usernameSpan && userEmailSpan && avatarInitial) {
+        if (currentUser && usernameSpan && userEmailSpan) {
             console.log('Navigation: updating user display info');
             
             // Update username
@@ -167,19 +210,94 @@ export class Navigation {
             
             // Update display name or show default
             const defaultDisplayName = `Player ${currentUser.id}`;
-            userEmailSpan.textContent = currentUser.display_name || defaultDisplayName;
+            // Only use default if display_name is null or undefined, not empty string
+            if (currentUser.display_name === null || currentUser.display_name === undefined) {
+                userEmailSpan.textContent = defaultDisplayName;
+                console.log('Navigation: display name not set, using default:', defaultDisplayName);
+            } else {
+                userEmailSpan.textContent = currentUser.display_name;
+                console.log('Navigation: using saved display name:', currentUser.display_name);
+            }
             console.log('Navigation: set display name to', userEmailSpan.textContent);
             
-            // Update avatar initial (use first letter of display name if available, otherwise username)
-            const initialSource = currentUser.display_name || currentUser.username;
-            avatarInitial.textContent = initialSource.charAt(0).toUpperCase();
-            console.log('Navigation: set avatar initial to', avatarInitial.textContent);
+            // Update avatar
+            this.updateUserAvatar(currentUser);
+        }
+    }
+
+    private updateUserAvatar(currentUser: any): void {
+        if (!currentUser) return;
+        
+        const avatarContainer = this.container.querySelector('.user-avatar');
+        const avatarInitial = this.container.querySelector('.avatar-initial');
+        
+        console.log('🔍 DEBUG: Navigation - Updating avatar for user:', currentUser.username);
+        
+        if (currentUser && currentUser.avatar_url) {
+            console.log('🔍 DEBUG: Navigation - User has avatar URL:', currentUser.avatar_url);
+            
+            // Ensure we have a complete URL for the avatar
+            let avatarUrl = currentUser.avatar_url;
+            
+            // If it's a backend path like /avatars/filename.jpg, prepend the API URL base
+            if (avatarUrl.startsWith('/avatars/')) {
+                const baseUrl = API_URL.substring(0, API_URL.indexOf('/api'));
+                avatarUrl = `${baseUrl}${avatarUrl}`;
+                console.log('🔍 DEBUG: Navigation - Transformed avatar URL to:', avatarUrl);
+            }
+            
+            console.log('🔍 DEBUG: Navigation - Final avatar URL:', avatarUrl);
+            
+            // Clear the container and add an image
+            if (avatarContainer) {
+                // Set a default avatar as fallback
+                const defaultAvatar = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI1MCIgZmlsbD0iIzY0OTVFRCIvPjxwYXRoIGZpbGw9IiNmZmYiIGQ9Ik03MyA2OWMtMS44LTMuNC03LjktNS42LTExLjktNi43LTQtMS4yLTEuNS0yLjYtMi43LTIuNnMtMy4xLS4xLTguMy0uMS04LjQtLjYtOS42LS42LTMuMyAxLjctNC44IDMuM2MtMS41IDEuNi41IDEzLjIuNSAxMy4yczIuNS0uOSA1LjktLjlTNTMgNzQgNTMgNzRzMS0yLjIgMi45LTIuMiAzLjctLjIgMTAgMGM2LjQuMSAxLjEgNy41IDIuMiA3LjVzNC40LS4zIDUtLjNjMy45LTIuNCAwLTEwIDAtMTB6Ii8+PHBhdGggZmlsbD0iI2ZmZiIgZD0iTTUwIDYxLjhjMTEuMSAwIDIwLjEtOS4xIDIwLjEtMjAuMyAwLTExLjItOS05LTIwLjEtOS4xLTExLjEgMC0yMC4xLTIuMS0yMC4xIDkuMXM5IDIwLjMgMjAuMSAyMC4zeiIvPjwvc3ZnPg==`;
+                
+                // Generate a unique cache-busting parameter to prevent browser caching
+                const timestamp = new Date().getTime();
+                const cacheParam = `?t=${timestamp}`;
+                
+                avatarContainer.innerHTML = `<img src="${avatarUrl}${cacheParam}" alt="${currentUser.username}" 
+                                                class="h-full w-full object-cover rounded-full"
+                                                onerror="this.onerror=null; this.src='${defaultAvatar}';">`;
+                console.log('🔍 DEBUG: Navigation - Avatar container after update:', avatarContainer.innerHTML);
+                
+                // Hide the avatar initial since we're showing the image
+                if (avatarInitial) {
+                    (avatarInitial as HTMLElement).style.display = 'none';
+                }
+                
+                // Add event listeners for tracking image loading
+                const img = avatarContainer.querySelector('img');
+                if (img) {
+                    img.addEventListener('load', () => {
+                        console.log('🔍 DEBUG: Navigation - Avatar image loaded successfully from:', avatarUrl);
+                    });
+                    
+                    img.addEventListener('error', () => {
+                        console.error('🔍 DEBUG: Navigation - Avatar image failed to load:', avatarUrl);
+                        // The onerror attribute will handle the fallback
+                    });
+                }
+            } else {
+                console.error('🔍 DEBUG: Navigation - Avatar container not found');
+            }
         } else {
-            console.log('Navigation: skipping user display update, missing elements or user data');
-            console.log('- currentUser:', currentUser);
-            console.log('- usernameSpan:', usernameSpan);
-            console.log('- userEmailSpan:', userEmailSpan);
-            console.log('- avatarInitial:', avatarInitial);
+            console.log('🔍 DEBUG: Navigation - No avatar URL, using initial');
+            // Make sure the initial is shown
+            if (avatarContainer && currentUser) {
+                // Default SVG avatar - same as used in AvatarUpload
+                const defaultAvatar = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI1MCIgZmlsbD0iIzY0OTVFRCIvPjxwYXRoIGZpbGw9IiNmZmYiIGQ9Ik03MyA2OWMtMS44LTMuNC03LjktNS42LTExLjktNi43LTQtMS4yLTEuNS0yLjYtMi43LTIuNnMtMy4xLS4xLTguMy0uMS04LjQtLjYtOS42LS42LTMuMyAxLjctNC44IDMuM2MtMS41IDEuNi41IDEzLjIuNSAxMy4yczIuNS0uOSA1LjktLjlTNTMgNzQgNTMgNzRzMS0yLjIgMi45LTIuMiAzLjctLjIgMTAgMGM2LjQuMSAxLjEgNy41IDIuMiA3LjVzNC40LS4zIDUtLjNjMy45LTIuNCAwLTEwIDAtMTB6Ii8+PHBhdGggZmlsbD0iI2ZmZiIgZD0iTTUwIDYxLjhjMTEuMSAwIDIwLjEtOS4xIDIwLjEtMjAuMyAwLTExLjItOS05LTIwLjEtOS4xLTExLjEgMC0yMC4xLTIuMS0yMC4xIDkuMXM5IDIwLjMgMjAuMSAyMC4zeiIvPjwvc3ZnPg==`;
+                
+                // Use the default avatar instead of initials
+                avatarContainer.innerHTML = `<img src="${defaultAvatar}" alt="${currentUser.username}" class="h-full w-full object-cover rounded-full">`;
+                console.log('🔍 DEBUG: Navigation - Set avatar to default SVG:', avatarContainer.innerHTML);
+                
+                // Hide the avatar initial since we're showing the image
+                if (avatarInitial) {
+                    (avatarInitial as HTMLElement).style.display = 'none';
+                }
+            }
         }
     }
 } 

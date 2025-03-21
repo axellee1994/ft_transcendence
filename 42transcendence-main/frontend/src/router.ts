@@ -9,6 +9,19 @@ type Route = {
 const routes: Route[] = [];
 const authService = AuthService.getInstance();
 
+// Helper function to check if a route pattern matches a path
+function matchRoute(pattern: string, path: string): boolean {
+    const patternParts = pattern.split('/');
+    const pathParts = path.split('/');
+    
+    if (patternParts.length !== pathParts.length) return false;
+    
+    return patternParts.every((part, i) => {
+        if (part.startsWith(':')) return true; // Dynamic segment
+        return part === pathParts[i];
+    });
+}
+
 export function registerRoute(path: string, component: (container: HTMLElement) => void, requiresAuth: boolean = false) {
     routes.push({ path, component, requiresAuth });
 }
@@ -16,46 +29,37 @@ export function registerRoute(path: string, component: (container: HTMLElement) 
 export function initRouter(container: HTMLElement) {
     // Function to handle route changes
     function handleRouteChange(path: string) {
-        const route = routes.find(r => r.path === path);
+        // First try to find an exact match
+        let route = routes.find(r => r.path === path);
+        
+        // If no exact match, try to find a dynamic route match
+        if (!route) {
+            route = routes.find(r => matchRoute(r.path, path));
+        }
         
         if (route) {
             if (route.requiresAuth && !authService.isAuthenticated()) {
                 // If not authenticated, show login dialog or redirect to login page
                 authService.showLoginDialog(() => {
                     // After successful login, render the route
-                    route.component(container);
+                    route!.component(container);
                 });
                 return;
             }
             route.component(container);
         } else {
-            // If path doesn't match any route, check if it's a sub-route
-            const segmentEnd = path.indexOf('/', 1);
-            const basePath = segmentEnd > 0 ? path.substring(0, segmentEnd) : path;
-            const baseRoute = routes.find(r => r.path === basePath);
-            
-            // If we found a base route, render it
-            if (baseRoute) {
-                if (baseRoute.requiresAuth && !authService.isAuthenticated()) {
-                    authService.showLoginDialog(() => {
-                        baseRoute.component(container);
-                    });
-                    return;
-                }
-                baseRoute.component(container);
-            } else {
-                // Fallback to home if route not found
-                const homeRoute = routes.find(r => r.path === '/');
-                if (homeRoute) {
-                    homeRoute.component(container);
-                    navigate('/');
-                }
+            // If no match found, fallback to home
+            const homeRoute = routes.find(r => r.path === '/');
+            if (homeRoute) {
+                homeRoute.component(container);
+                navigate('/');
             }
         }
     }
 
     // Navigation function using History API
     function navigate(path: string) {
+        console.log('Navigating to:', path); // Debug log
         history.pushState({ path }, '', path);
         handleRouteChange(path);
     }

@@ -62,8 +62,12 @@ export function renderFriendsPage(container: HTMLElement): void {
     // Initialize friend list component
     new FriendList({
         container: friendListContainer,
-        onViewProfile: (userId: number) => {
-            window.location.href = `/profile/${userId}`;
+        onViewProfile: (userId) => {
+            if ((window as any).navigate) {
+                (window as any).navigate(`/profile/${userId}`);
+            } else {
+                window.location.href = `/profile/${userId}`;
+            }
         }
     });
 } 

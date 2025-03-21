@@ -4,12 +4,19 @@ import { renderHomePage } from './pages/HomePage';
 import { renderGamePage } from './pages/GamePage';
 import { renderProfilePage } from './pages/ProfilePage';
 import { renderLeaderboardPage } from './pages/LeaderboardPage';
-import { renderSettingsPage } from './pages/SettingsPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { renderFriendsPage } from './pages/FriendsPage';
 import { renderFriendSearchPage } from './pages/FriendSearchPage';
 import { Layout } from './components/Layout';
 import './styles.css';
 import { UserProfile } from './components/UserProfile';
+
+// Clear localStorage in development mode when the app starts
+if (window.location.hostname === 'localhost') {
+    console.log('Development mode detected, clearing localStorage...');
+    localStorage.clear();
+    console.log('localStorage cleared');
+}
 
 // Get the app container
 const appContainer = document.getElementById('app');
@@ -45,7 +52,7 @@ registerRoute('/leaderboard', (container) => {
 });
 
 registerRoute('/settings', (container) => {
-    renderSettingsPage(layout.getContentContainer());
+    new SettingsPage(layout.getContentContainer());
 }, true);
 
 registerRoute('/friends', (container) => {

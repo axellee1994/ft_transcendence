@@ -38,18 +38,26 @@ const fastify = Fastify({
 
 // Register CORS plugin first
 await fastify.register(cors, {
-    origin: 'http://localhost:4000',
+    origin: true, // Allow all origins in development
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    exposedHeaders: ['Authorization'],
+    maxAge: 86400, // Cache preflight requests for 24 hours
+    preflight: true,
+    preflightContinue: true
 });
 
 // Configure multipart for file uploads
 await fastify.register(multipart, {
     limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB limit
+        fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024, // Use env var or default to 5MB
+        files: 1 // Allow only 1 file per request
     },
-    attachFieldsToBody: true,
+    attachFieldsToBody: false,
+    onFile: (fieldname, stream, filename, encoding, mimetype) => {
+        // This is just for setup, actual handling is done in the routes
+    }
 });
 
 // Add static files from tests directory
@@ -61,7 +69,7 @@ await fastify.register(staticFiles, {
 
 // Add static files for avatars
 await fastify.register(staticFiles, {
-    root: path.join(__dirname, '../uploads/avatars'),
+    root: process.env.AVATAR_UPLOADS_DIR || path.join(__dirname, '../uploads/avatars'),
     prefix: '/avatars/',
     decorateReply: false
 });
@@ -101,19 +109,17 @@ await fastify.register(tournamentRoutes, { prefix: '/api/tournaments' });
 await fastify.register(friendRoutes, { prefix: '/api/friends' });
 await fastify.register(matchHistoryRoutes, { prefix: '/api/match-history' });
 
-// Add health check endpoint
+// Health check endpoint
 fastify.get('/api/health', async (request, reply) => {
-    return { status: 'ok' };
-});
-
-// Health check route
-fastify.get('/health', async () => {
     return { status: 'ok' };
 });
 
 // Start the server
 try {
-    await fastify.listen({ port: 4002, host: '0.0.0.0' });
+    await fastify.listen({ 
+        port: parseInt(process.env.PORT) || 4002, 
+        host: process.env.HOST || '0.0.0.0' 
+    });
     fastify.log.info(`Server listening on ${fastify.server.address().port}`);
 } catch (err) {
     fastify.log.error(err);

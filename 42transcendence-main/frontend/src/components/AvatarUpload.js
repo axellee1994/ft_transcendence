@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import axios from 'axios';
+import { API_URL } from '../services/auth';
 
 const AvatarUpload = ({ currentAvatar, onAvatarUpdate }) => {
     const [preview, setPreview] = useState(null);
@@ -7,7 +7,7 @@ const AvatarUpload = ({ currentAvatar, onAvatarUpdate }) => {
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef(null);
 
-    const handleFileSelect = (event) => {
+    const handleFileSelect = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
 
@@ -32,32 +32,56 @@ const AvatarUpload = ({ currentAvatar, onAvatarUpdate }) => {
         reader.readAsDataURL(file);
 
         // Upload file
-        uploadAvatar(file);
+        await uploadAvatar(file);
     };
 
     const uploadAvatar = async (file) => {
         setIsUploading(true);
         setError(null);
 
-        const formData = new FormData();
-        formData.append('avatar', file);
-
         try {
+            console.log('Uploading avatar file:', file);
+            
             const token = localStorage.getItem('auth_token');
-            const response = await axios.post('/api/users/avatar', formData, {
+            if (!token) {
+                throw new Error('Authentication required');
+            }
+
+            const formData = new FormData();
+            formData.append('avatar', file);
+
+            const response = await fetch(`${API_URL}/users/avatar`, {
+                method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${token}`
                 },
+                body: formData
             });
 
-            onAvatarUpdate(response.data.avatar_url);
+            if (!response.ok) {
+                throw new Error('Failed to upload avatar');
+            }
+
+            const data = await response.json();
+            
+            console.log('Avatar uploaded successfully:', data.avatar_url);
+            
+            if (onAvatarUpdate) {
+                onAvatarUpdate(data.avatar_url);
+            }
             setPreview(null);
         } catch (err) {
-            setError(err.response?.data?.error || 'Failed to upload avatar');
+            console.error('Error uploading avatar:', err);
+            setError(err.message || 'Failed to upload avatar');
             setPreview(null);
         } finally {
             setIsUploading(false);
+            
+            // Clear the file input
+            const fileInput = fileInputRef.current;
+            if (fileInput) {
+                fileInput.value = '';
+            }
         }
     };
 

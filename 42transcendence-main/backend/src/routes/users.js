@@ -1,14 +1,27 @@
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
+import { pipeline } from 'stream';
+import { promisify } from 'util';
+import { Readable } from 'stream';
+
+// Promisify the pipeline function for async/await usage
+const pipelineAsync = promisify(pipeline);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Get uploads directory from environment variable or use default
+const uploadsDir = process.env.AVATAR_UPLOADS_DIR || join(__dirname, '../../uploads/avatars');
+
 // Ensure uploads directory exists
-const uploadsDir = join(__dirname, '../../uploads/avatars');
-await fs.mkdir(uploadsDir, { recursive: true });
+try {
+    await fs.mkdir(uploadsDir, { recursive: true });
+} catch (err) {
+    console.error('Error creating avatars directory:', err);
+}
 
 export async function userRoutes(fastify, options) {
     const userSchema = {
@@ -257,47 +270,261 @@ export async function userRoutes(fastify, options) {
         }
     });
 
-    // Upload avatar
-    fastify.post('/avatar', {
+    // New route with :id parameter
+    fastify.put('/:id/avatar', {
+        schema: {
+            params: {
+                type: 'object',
+                properties: {
+                    id: { type: 'integer' }
+                },
+                required: ['id']
+            },
+            consumes: ['multipart/form-data']
+        },
         onRequest: [fastify.authenticate]
     }, async (request, reply) => {
         try {
-            const file = await request.file('avatar');
+            const { id } = request.params;
+            
+            // Check if user has permission to update this avatar
+            if (request.user.id !== parseInt(id)) {
+                return reply.code(403).send({ error: 'Unauthorized to update this avatar' });
+            }
+            
+            fastify.log.info('Processing avatar upload');
+            
+            // Get the uploaded file using request.file()
+            const file = await request.file();
             
             if (!file) {
-                reply.code(400).send({ error: 'No file uploaded' });
-                return;
+                fastify.log.info('No file received in request');
+                return reply.code(400).send({ error: 'No file uploaded' });
             }
-
+            
+            fastify.log.info(`Received file: ${file.filename}, mimetype: ${file.mimetype}, fieldname: ${file.fieldname}`);
+            
+            // Check if it's actually an avatar upload
+            if (file.fieldname !== 'avatar') {
+                fastify.log.info(`Invalid field name: ${file.fieldname}, expected 'avatar'`);
+                return reply.code(400).send({ error: 'Invalid form field, expected "avatar"' });
+            }
+            
+            // Validate file type
+            const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            if (!allowedMimeTypes.includes(file.mimetype)) {
+                fastify.log.info(`Invalid file type: ${file.mimetype}`);
+                return reply.code(400).send({ error: 'File must be a valid image (JPEG, PNG, GIF, or WebP)' });
+            }
+            
+            // Sanitize filename to prevent directory traversal
+            const sanitizedFilename = path.basename(file.filename).replace(/[^a-zA-Z0-9.-]/g, '_');
+            const fileExt = path.extname(sanitizedFilename) || '.jpg';
+            
+            // Generate unique filename with timestamp and random string
+            const timestamp = Date.now();
+            const randomString = Math.random().toString(36).substring(2, 8);
+            const newFilename = `${id}-${timestamp}-${randomString}${fileExt}`;
+            const savePath = join(uploadsDir, newFilename);
+            
+            fastify.log.info(`Saving file to: ${savePath}`);
+            
+            // Ensure directory exists
+            await fs.mkdir(path.dirname(savePath), { recursive: true });
+            
+            // Create write stream and pipe the file to it
+            const writeStream = fsSync.createWriteStream(savePath);
+            await pipelineAsync(file.file, writeStream);
+            
+            fastify.log.info('File saved successfully');
+            
+            // Delete old avatar if it exists
+            const oldUser = await fastify.db.get('SELECT avatar_url FROM users WHERE id = ?', [id]);
+            if (oldUser && oldUser.avatar_url) {
+                const oldAvatarPath = join(uploadsDir, path.basename(oldUser.avatar_url));
+                try {
+                    await fs.unlink(oldAvatarPath);
+                    fastify.log.info(`Deleted old avatar: ${oldAvatarPath}`);
+                } catch (err) {
+                    // Don't fail if old avatar couldn't be deleted
+                    fastify.log.warn(`Could not delete old avatar: ${err.message}`);
+                }
+            }
+            
+            // Update user's avatar URL in database
+            const avatarUrl = `/avatars/${newFilename}`;
+            await fastify.db.run(
+                'UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [avatarUrl, id]
+            );
+            
+            fastify.log.info(`User ${id} avatar updated to ${avatarUrl}`);
+            
+            // Get updated user data
+            const [user] = await fastify.db.all(
+                'SELECT id, username, display_name, email, avatar_url, is_online, last_seen FROM users WHERE id = ?',
+                [id]
+            );
+            
+            return reply.send({
+                message: 'Avatar uploaded successfully',
+                avatar_url: avatarUrl,
+                user: user
+            });
+        } catch (err) {
+            fastify.log.error('Error in avatar upload: ' + err.message);
+            fastify.log.error(err);
+            return reply.code(500).send({ error: 'Internal Server Error' });
+        }
+    });
+    
+    // Upload avatar - original POST route for backward compatibility
+    fastify.post('/avatar', {
+        schema: {
+            consumes: ['multipart/form-data']
+        },
+        onRequest: [fastify.authenticate]
+    }, async (request, reply) => {
+        try {
+            fastify.log.info('Processing avatar upload via POST /avatar');
+            
+            // Get the uploaded file using request.file()
+            const file = await request.file();
+            
+            if (!file) {
+                fastify.log.info('No file received in request');
+                return reply.code(400).send({ error: 'No file uploaded' });
+            }
+            
+            fastify.log.info(`Received file: ${file.filename}, mimetype: ${file.mimetype}, fieldname: ${file.fieldname}`);
+            
+            // Check if it's actually an avatar upload
+            if (file.fieldname !== 'avatar') {
+                fastify.log.info(`Invalid field name: ${file.fieldname}, expected 'avatar'`);
+                return reply.code(400).send({ error: 'Invalid form field, expected "avatar"' });
+            }
+            
             // Validate file type
             if (!file.mimetype.startsWith('image/')) {
-                reply.code(400).send({ error: 'File must be an image' });
-                return;
+                fastify.log.info(`Invalid file type: ${file.mimetype}`);
+                return reply.code(400).send({ error: 'File must be an image' });
             }
-
+            
             // Generate unique filename
-            const ext = path.extname(file.filename);
-            const filename = `${request.user.id}-${Date.now()}${ext}`;
-            const filepath = join(uploadsDir, filename);
-
-            // Save file
-            await file.toBuffer();
-            await fs.writeFile(filepath, await file.toBuffer());
-
+            const fileExt = path.extname(file.filename) || '.jpg';
+            const newFilename = `${request.user.id}-${Date.now()}${fileExt}`;
+            const savePath = join(uploadsDir, newFilename);
+            
+            fastify.log.info(`Saving file to: ${savePath}`);
+            
+            // Ensure directory exists
+            await fs.mkdir(path.dirname(savePath), { recursive: true });
+            
+            // Create write stream and pipe the file to it
+            const writeStream = fsSync.createWriteStream(savePath);
+            await pipelineAsync(file.file, writeStream);
+            
+            fastify.log.info('File saved successfully');
+            
             // Update user's avatar URL in database
-            const avatarUrl = `/avatars/${filename}`;
+            const avatarUrl = `/avatars/${newFilename}`;
             await fastify.db.run(
                 'UPDATE users SET avatar_url = ? WHERE id = ?',
                 [avatarUrl, request.user.id]
             );
-
-            reply.send({ 
+            
+            fastify.log.info(`User ${request.user.id} avatar updated to ${avatarUrl}`);
+            
+            // Get updated user data
+            const [user] = await fastify.db.all(
+                'SELECT id, username, display_name, email, avatar_url, is_online, last_seen FROM users WHERE id = ?',
+                [request.user.id]
+            );
+            
+            return reply.send({
                 message: 'Avatar uploaded successfully',
-                avatar_url: avatarUrl
+                avatar_url: avatarUrl,
+                user: user
             });
         } catch (err) {
+            fastify.log.error('Error in avatar upload: ' + err.message);
             fastify.log.error(err);
-            reply.code(500).send({ error: 'Internal Server Error' });
+            return reply.code(500).send({ error: 'Internal Server Error' });
+        }
+    });
+    
+    // Upload avatar - original PUT route for backward compatibility
+    fastify.put('/avatar', {
+        schema: {
+            consumes: ['multipart/form-data']
+        },
+        onRequest: [fastify.authenticate]
+    }, async (request, reply) => {
+        try {
+            fastify.log.info('Processing avatar upload via PUT /avatar');
+            
+            // Get the uploaded file using request.file()
+            const file = await request.file();
+            
+            if (!file) {
+                fastify.log.info('No file received in request');
+                return reply.code(400).send({ error: 'No file uploaded' });
+            }
+            
+            fastify.log.info(`Received file: ${file.filename}, mimetype: ${file.mimetype}, fieldname: ${file.fieldname}`);
+            
+            // Check if it's actually an avatar upload
+            if (file.fieldname !== 'avatar') {
+                fastify.log.info(`Invalid field name: ${file.fieldname}, expected 'avatar'`);
+                return reply.code(400).send({ error: 'Invalid form field, expected "avatar"' });
+            }
+            
+            // Validate file type
+            if (!file.mimetype.startsWith('image/')) {
+                fastify.log.info(`Invalid file type: ${file.mimetype}`);
+                return reply.code(400).send({ error: 'File must be an image' });
+            }
+            
+            // Generate unique filename
+            const fileExt = path.extname(file.filename) || '.jpg';
+            const newFilename = `${request.user.id}-${Date.now()}${fileExt}`;
+            const savePath = join(uploadsDir, newFilename);
+            
+            fastify.log.info(`Saving file to: ${savePath}`);
+            
+            // Ensure directory exists
+            await fs.mkdir(path.dirname(savePath), { recursive: true });
+            
+            // Create write stream and pipe the file to it
+            const writeStream = fsSync.createWriteStream(savePath);
+            await pipelineAsync(file.file, writeStream);
+            
+            fastify.log.info('File saved successfully');
+            
+            // Update user's avatar URL in database
+            const avatarUrl = `/avatars/${newFilename}`;
+            await fastify.db.run(
+                'UPDATE users SET avatar_url = ? WHERE id = ?',
+                [avatarUrl, request.user.id]
+            );
+            
+            fastify.log.info(`User ${request.user.id} avatar updated to ${avatarUrl}`);
+            
+            // Get updated user data
+            const [user] = await fastify.db.all(
+                'SELECT id, username, display_name, email, avatar_url, is_online, last_seen FROM users WHERE id = ?',
+                [request.user.id]
+            );
+            
+            return reply.send({
+                message: 'Avatar uploaded successfully',
+                avatar_url: avatarUrl,
+                user: user
+            });
+        } catch (err) {
+            fastify.log.error('Error in avatar upload: ' + err.message);
+            fastify.log.error(err);
+            return reply.code(500).send({ error: 'Internal Server Error' });
         }
     });
 

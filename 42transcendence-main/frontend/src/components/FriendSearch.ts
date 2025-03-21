@@ -1,3 +1,5 @@
+import { API_URL } from '../services/auth';
+
 interface User {
     id: number;
     username: string;
@@ -15,6 +17,19 @@ interface FriendshipStatus {
 interface FriendSearchProps {
     container: HTMLElement;
     onViewProfile?: (userId: number) => void;
+}
+
+// Helper function to get the full avatar URL
+function getFullAvatarUrl(avatarUrl: string): string {
+    if (!avatarUrl) return '';
+    
+    // If it's a backend path like /avatars/filename.jpg, prepend the API URL base
+    if (avatarUrl.startsWith('/avatars/')) {
+        const baseUrl = API_URL.substring(0, API_URL.indexOf('/api'));
+        return `${baseUrl}${avatarUrl}`;
+    }
+    
+    return avatarUrl;
 }
 
 export class FriendSearch {
@@ -89,7 +104,7 @@ export class FriendSearch {
                         <div class="flex items-center space-x-3">
                             <div class="relative h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
                                 ${user.avatar_url 
-                                    ? `<img src="${user.avatar_url}" alt="${user.username}" class="h-10 w-10 rounded-full object-cover">`
+                                    ? `<img src="${getFullAvatarUrl(user.avatar_url)}" alt="${user.username}" class="h-10 w-10 rounded-full object-cover">`
                                     : `<span class="text-white font-medium">${user.username.charAt(0).toUpperCase()}</span>`
                                 }
                                 <span class="absolute bottom-0 right-0 h-3 w-3 rounded-full ${user.is_online ? 'bg-green-500' : 'bg-gray-400'}"></span>

@@ -1,3 +1,6 @@
+import { AuthService, API_URL } from '../services/auth';
+import { formatRelativeTime } from '../utils/dateUtils';
+
 interface Friend {
     id: number;
     username: string;
@@ -287,8 +290,9 @@ export class FriendList {
             avatarContainer.className = 'relative h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center';
             
             if (friend.avatar_url) {
+                avatarContainer.classList.add('has-avatar');
                 const avatarImg = document.createElement('img');
-                avatarImg.src = friend.avatar_url;
+                avatarImg.src = this.getFullAvatarUrl(friend.avatar_url);
                 avatarImg.alt = friend.username;
                 avatarImg.className = 'h-10 w-10 rounded-full object-cover';
                 avatarContainer.appendChild(avatarImg);
@@ -378,8 +382,9 @@ export class FriendList {
             avatarContainer.className = 'h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center';
             
             if (request.avatar_url) {
+                avatarContainer.classList.add('has-avatar');
                 const avatarImg = document.createElement('img');
-                avatarImg.src = request.avatar_url;
+                avatarImg.src = this.getFullAvatarUrl(request.avatar_url);
                 avatarImg.alt = request.username;
                 avatarImg.className = 'h-10 w-10 rounded-full object-cover';
                 avatarContainer.appendChild(avatarImg);
@@ -437,21 +442,7 @@ export class FriendList {
     }
 
     private formatLastSeen(lastSeen: string): string {
-        const lastSeenDate = new Date(lastSeen);
-        const now = new Date();
-        const diffMs = now.getTime() - lastSeenDate.getTime();
-        const diffMins = Math.floor(diffMs / 60000);
-        
-        if (diffMins < 1) {
-            return 'Just now';
-        } else if (diffMins < 60) {
-            return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
-        } else if (diffMins < 1440) {
-            const hours = Math.floor(diffMins / 60);
-            return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-        } else {
-            return lastSeenDate.toLocaleDateString();
-        }
+        return formatRelativeTime(lastSeen);
     }
 
     private addEventListeners(): void {
@@ -579,7 +570,7 @@ export class FriendList {
             
             // Make sure we have the correct API URL prefix
             const apiUrl = window.location.hostname === 'localhost' ? 
-                        `http://${window.location.hostname}:4002/api/friends/${userId}/accept` : 
+                        `http://${window.location.hostname}:4002/api/friends/${userId}/accept` :
                         `/api/friends/${userId}/accept`;
             
             console.log('Accepting friend request, API URL:', apiUrl);
@@ -590,7 +581,9 @@ export class FriendList {
                 headers: { 
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                // Adding an empty object as body to satisfy the Content-Type requirement
+                body: JSON.stringify({})
             });
 
             console.log('Accept response status:', response.status, response.statusText);
@@ -616,6 +609,16 @@ export class FriendList {
             await this.refresh();
         } catch (err) {
             console.error('Failed to accept friend request:', err);
+            
+            // Reset the button state for all accept buttons for this user
+            const acceptButtons = this.props.container.querySelectorAll(`.accept-request[data-user-id="${userId}"]`);
+            acceptButtons.forEach(button => {
+                const buttonElement = button as HTMLElement;
+                buttonElement.textContent = 'Accept';
+                buttonElement.classList.remove('opacity-50');
+                buttonElement.classList.remove('pointer-events-none');
+            });
+            
             alert(`Failed to accept friend request: ${err instanceof Error ? err.message : 'Unknown error'}`);
         }
     }
@@ -630,7 +633,7 @@ export class FriendList {
             
             // Make sure we have the correct API URL prefix
             const apiUrl = window.location.hostname === 'localhost' ? 
-                        `http://${window.location.hostname}:4002/api/friends/${userId}/reject` : 
+                        `http://${window.location.hostname}:4002/api/friends/${userId}/reject` :
                         `/api/friends/${userId}/reject`;
             
             console.log('Rejecting friend request, API URL:', apiUrl);
@@ -641,7 +644,9 @@ export class FriendList {
                 headers: { 
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                // Adding an empty object as body to satisfy the Content-Type requirement
+                body: JSON.stringify({})
             });
 
             console.log('Reject response status:', response.status, response.statusText);
@@ -667,6 +672,16 @@ export class FriendList {
             await this.refresh();
         } catch (err) {
             console.error('Failed to reject friend request:', err);
+            
+            // Reset the button state for all reject buttons for this user
+            const rejectButtons = this.props.container.querySelectorAll(`.reject-request[data-user-id="${userId}"]`);
+            rejectButtons.forEach(button => {
+                const buttonElement = button as HTMLElement;
+                buttonElement.textContent = 'Reject';
+                buttonElement.classList.remove('opacity-50');
+                buttonElement.classList.remove('pointer-events-none');
+            });
+            
             alert(`Failed to reject friend request: ${err instanceof Error ? err.message : 'Unknown error'}`);
         }
     }
@@ -687,5 +702,18 @@ export class FriendList {
             this.filteredFriends = [...this.friends];
         }
         this.render();
+    }
+
+    // Helper function to get the full avatar URL
+    private getFullAvatarUrl(avatarUrl: string): string {
+        if (!avatarUrl) return '';
+        
+        // If it's a backend path like /avatars/filename.jpg, prepend the API URL base
+        if (avatarUrl.startsWith('/avatars/')) {
+            const baseUrl = API_URL.substring(0, API_URL.indexOf('/api'));
+            return `${baseUrl}${avatarUrl}`;
+        }
+        
+        return avatarUrl;
     }
 } 

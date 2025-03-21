@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import AvatarUpload from './AvatarUpload';
+import { API_URL } from '../services/auth';
 
 const UserProfile = () => {
     const [user, setUser] = useState(null);
@@ -19,15 +19,29 @@ const UserProfile = () => {
     const fetchUserProfile = async () => {
         try {
             const token = localStorage.getItem('auth_token');
-            const response = await axios.get('/api/users/me', {
-                headers: { 'Authorization': `Bearer ${token}` }
+            if (!token) {
+                throw new Error('Authentication required');
+            }
+
+            const response = await fetch(`${API_URL}/users/me`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
             });
-            setUser(response.data);
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch user data');
+            }
+
+            const userData = await response.json();
+            setUser(userData);
             setFormData({
-                display_name: response.data.display_name || '',
-                email: response.data.email || ''
+                display_name: userData.display_name || '',
+                email: userData.email || ''
             });
-        } catch (err) {
+        } catch (error) {
+            console.error('Error fetching user data:', error);
             setError('Failed to load user profile');
         } finally {
             setLoading(false);
@@ -46,13 +60,29 @@ const UserProfile = () => {
         e.preventDefault();
         try {
             const token = localStorage.getItem('auth_token');
-            const response = await axios.put('/api/users/me', formData, {
-                headers: { 'Authorization': `Bearer ${token}` }
+            if (!token) {
+                throw new Error('Authentication required');
+            }
+
+            const response = await fetch(`${API_URL}/users/me`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
             });
-            setUser(response.data);
+
+            if (!response.ok) {
+                throw new Error('Failed to update profile');
+            }
+
+            const updatedUser = await response.json();
+            setUser(updatedUser);
             setIsEditing(false);
-        } catch (err) {
-            setError(err.response?.data?.error || 'Failed to update profile');
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            setError(error.message || 'Failed to update profile');
         }
     };
 

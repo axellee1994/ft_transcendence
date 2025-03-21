@@ -28,7 +28,11 @@ export function renderFriendSearchPage(container: HTMLElement): void {
         new FriendSearch({
             container: friendSearchContainer,
             onViewProfile: (userId) => {
-                window.location.href = `/profile/${userId}`;
+                if ((window as any).navigate) {
+                    (window as any).navigate(`/profile/${userId}`);
+                } else {
+                    window.location.href = `/profile/${userId}`;
+                }
             }
         });
     }
@@ -38,7 +42,11 @@ export function renderFriendSearchPage(container: HTMLElement): void {
     if (backLink) {
         backLink.addEventListener('click', (e) => {
             e.preventDefault();
-            window.location.href = '/friends';
+            if ((window as any).navigate) {
+                (window as any).navigate('/friends');
+            } else {
+                window.location.href = '/friends';
+            }
         });
     }
 } 

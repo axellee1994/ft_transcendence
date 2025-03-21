@@ -1,327 +1,531 @@
 import { AuthService } from '../services/auth';
-import { Navigation } from '../components/Navigation';
+import { AvatarUpload } from '../components/AvatarUpload';
 
-export function renderSettingsPage(container: HTMLElement): void {
-    const authService = AuthService.getInstance();
-    const currentUser = authService.getCurrentUser();
+export class SettingsPage {
+    private container: HTMLElement;
+    private avatarUpload: AvatarUpload | null = null;
+    private originalValues: {
+        username: string;
+        display_name: string;
+        email: string;
+        avatar_url: string;
+    } | null = null;
+    private activeTab: 'profile' | 'account' | 'password' = 'profile';
+    private hasProfileChanges: boolean = false;
 
-    container.innerHTML = `
-        <div class="py-8">
-            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="bg-white rounded-lg shadow-xl p-8">
-                    <h1 class="text-3xl font-bold text-gray-900 mb-8">Settings</h1>
-                    
-                    <div class="flex flex-col md:flex-row gap-8">
-                        <!-- Settings Navigation -->
-                        <div class="md:w-1/4">
-                            <div class="bg-gray-50 rounded-lg shadow-md p-4">
-                                <ul class="space-y-2">
-                                    <li>
-                                        <button id="account-tab-btn" class="w-full text-left px-4 py-2 bg-blue-500 text-white rounded-lg font-medium">
-                                            Account
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <button id="game-tab-btn" class="w-full text-left px-4 py-2 hover:bg-gray-200 rounded-lg font-medium transition">
-                                            Game Settings
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <button id="appearance-tab-btn" class="w-full text-left px-4 py-2 hover:bg-gray-200 rounded-lg font-medium transition">
-                                            Appearance
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <button id="notifications-tab-btn" class="w-full text-left px-4 py-2 hover:bg-gray-200 rounded-lg font-medium transition">
-                                            Notifications
-                                        </button>
-                                    </li>
-                                </ul>
+    constructor(container: HTMLElement) {
+        this.container = container;
+        this.initialize();
+    }
+
+    private async initialize(): Promise<void> {
+        try {
+            // Get current user data
+            const userData = localStorage.getItem('user_data');
+            if (!userData) {
+                throw new Error('User data not found');
+            }
+
+            this.originalValues = JSON.parse(userData);
+            await this.renderSettingsPage();
+            this.setupTabSwitching();
+
+        } catch (error) {
+            console.error('Failed to initialize settings page:', error);
+            this.showError('Failed to load settings. Please try again later.');
+        }
+    }
+
+    private async renderSettingsPage(): Promise<void> {
+        if (!this.originalValues) return;
+
+        this.container.innerHTML = `
+            <div class="settings-page p-6 max-w-6xl mx-auto">
+                <h1 class="text-2xl font-bold mb-6">Account Settings</h1>
+                
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <!-- Tabs -->
+                    <div class="flex border-b">
+                        <button id="profile-tab" class="px-6 py-3 border-b-2 border-blue-500 font-medium text-sm text-blue-600">
+                            Profile
+                        </button>
+                        <button id="account-tab" class="px-6 py-3 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                            Account
+                        </button>
+                        <button id="password-tab" class="px-6 py-3 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                            Password
+                        </button>
+                    </div>
+
+                    <!-- Tab Content -->
+                    <div class="p-6">
+                        <!-- Profile Tab -->
+                        <div id="profile-content" class="tab-content">
+                            <div class="space-y-6">
+                                <div class="flex flex-col md:flex-row gap-6 items-start">
+                                    <div class="w-full md:w-1/3">
+                                        <h2 class="text-lg font-medium">Profile Picture</h2>
+                                        <p class="text-sm text-gray-500 mt-1">This will be displayed on your profile</p>
+                                    </div>
+                                    <div class="w-full md:w-2/3" id="avatar-container"></div>
+                                </div>
+                                
+                                <div class="flex flex-col md:flex-row gap-6 items-start pt-6 border-t">
+                                    <div class="w-full md:w-1/3">
+                                        <h2 class="text-lg font-medium">Personal Information</h2>
+                                        <p class="text-sm text-gray-500 mt-1">Update your personal details</p>
+                                    </div>
+                                    <div class="w-full md:w-2/3">
+                                        <form id="profile-form" class="space-y-4">
+                                            <div class="form-group">
+                                                <label for="display_name" class="block text-sm font-medium text-gray-700">Display Name</label>
+                                                <input 
+                                                    type="text" 
+                                                    id="display_name" 
+                                                    name="display_name" 
+                                                    value="${this.originalValues.display_name || ''}"
+                                                    placeholder="How you want to be known"
+                                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                                />
+                                                <p class="mt-1 text-sm text-gray-500">
+                                                    This is the name that will be displayed to other users
+                                                </p>
+                                            </div>
+
+                                            <div class="mt-6">
+                                                <button 
+                                                    type="submit"
+                                                    id="save-profile-btn"
+                                                    class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                                    disabled
+                                                >
+                                                    Save Profile
+                                                </button>
+                                                <button 
+                                                    type="button"
+                                                    id="cancel-profile-btn"
+                                                    class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors ml-2 hidden"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        
-                        <!-- Settings Content -->
-                        <div class="md:w-3/4">
-                            <!-- Account Settings Tab -->
-                            <div id="account-tab" class="bg-gray-50 rounded-lg shadow-md p-6">
-                                <h2 class="text-2xl font-bold text-gray-800 mb-4">Account Settings</h2>
-                                
-                                <form id="account-form" class="space-y-6">
-                                    <div class="flex items-center space-x-6 mb-6">
-                                        <div class="relative">
-                                            <div class="h-24 w-24 rounded-full bg-blue-500 flex items-center justify-center overflow-hidden">
-                                                ${currentUser?.avatar_url 
-                                                    ? `<img src="${currentUser.avatar_url}" alt="Profile" class="h-full w-full object-cover">`
-                                                    : `<span class="text-4xl text-white font-medium">${currentUser?.username?.charAt(0).toUpperCase() || 'U'}</span>`
-                                                }
+
+                        <!-- Account Tab -->
+                        <div id="account-content" class="tab-content hidden">
+                            <div class="space-y-6">
+                                <div class="flex flex-col md:flex-row gap-6 items-start">
+                                    <div class="w-full md:w-1/3">
+                                        <h2 class="text-lg font-medium">Account Information</h2>
+                                        <p class="text-sm text-gray-500 mt-1">Manage your account details</p>
+                                    </div>
+                                    <div class="w-full md:w-2/3">
+                                        <form id="account-form" class="space-y-4">
+                                            <div class="form-group">
+                                                <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
+                                                <input 
+                                                    type="text" 
+                                                    id="username" 
+                                                    name="username" 
+                                                    value="${this.originalValues.username}"
+                                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                                />
+                                                <p class="mt-1 text-sm text-gray-500">
+                                                    This is your unique identifier on the platform
+                                                </p>
                                             </div>
-                                            <label for="avatar-upload" class="absolute bottom-0 right-0 bg-blue-500 text-white p-1 rounded-full cursor-pointer hover:bg-blue-600 transition-colors">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                                </svg>
-                                            </label>
-                                            <input type="file" id="avatar-upload" class="hidden" accept="image/*">
-                                        </div>
-                                        <div>
-                                            <h3 class="text-lg font-medium text-gray-900">Profile Picture</h3>
-                                            <p class="text-sm text-gray-500">Click the edit icon to change your avatar</p>
-                                        </div>
-                                    </div>
 
-                                    <div>
-                                        <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                                        <input type="text" id="username" value="${currentUser?.username || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                                    </div>
+                                            <div class="form-group mt-4">
+                                                <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                                                <input 
+                                                    type="email" 
+                                                    id="email" 
+                                                    name="email" 
+                                                    value="${this.originalValues.email}"
+                                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                                />
+                                                <p class="mt-1 text-sm text-gray-500">
+                                                    We'll never share your email with anyone else
+                                                </p>
+                                            </div>
 
-                                    <div>
-                                        <label for="display-name" class="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
-                                        <input type="text" id="display-name" value="${currentUser?.display_name || ''}" placeholder="Choose a unique display name for tournaments" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                            <div class="mt-6">
+                                                <button 
+                                                    type="submit"
+                                                    class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                                                >
+                                                    Save Account Details
+                                                </button>
+                                            </div>
+                                        </form>
                                     </div>
-                                    
-                                    <div>
-                                        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                        <input type="email" id="email" value="${currentUser?.email || ''}" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                                    </div>
-                                    
-                                    <div>
-                                        <label for="current-password" class="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-                                        <input type="password" id="current-password" placeholder="Enter your current password" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                                    </div>
-                                    
-                                    <div>
-                                        <label for="new-password" class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                                        <input type="password" id="new-password" placeholder="Enter new password" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                                    </div>
-                                    
-                                    <div>
-                                        <label for="confirm-password" class="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-                                        <input type="password" id="confirm-password" placeholder="Confirm new password" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                                    </div>
-                                    
-                                    <div class="flex justify-end">
-                                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded transition duration-200">
-                                            Save Changes
-                                        </button>
-                                    </div>
-                                </form>
+                                </div>
                             </div>
-                            
-                            <!-- Game Settings Tab (Hidden by default) -->
-                            <div id="game-tab" class="hidden bg-gray-50 rounded-lg shadow-md p-6">
-                                <h2 class="text-2xl font-bold text-gray-800 mb-4">Game Settings</h2>
-                                
-                                <form id="game-settings-form" class="space-y-6">
-                                    <div>
-                                        <label for="difficulty" class="block text-sm font-medium text-gray-700 mb-1">Difficulty</label>
-                                        <select id="difficulty" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
-                                            <option value="easy">Easy</option>
-                                            <option value="medium" selected>Medium</option>
-                                            <option value="hard">Hard</option>
-                                        </select>
+                        </div>
+
+                        <!-- Password Tab -->
+                        <div id="password-content" class="tab-content hidden">
+                            <div class="space-y-6">
+                                <div class="flex flex-col md:flex-row gap-6 items-start">
+                                    <div class="w-full md:w-1/3">
+                                        <h2 class="text-lg font-medium">Change Password</h2>
+                                        <p class="text-sm text-gray-500 mt-1">Ensure your account is using a secure password</p>
                                     </div>
-                                    
-                                    <div>
-                                        <label for="game-speed" class="block text-sm font-medium text-gray-700 mb-1">Game Speed</label>
-                                        <input type="range" id="game-speed" min="1" max="10" value="5" class="w-full">
-                                        <div class="flex justify-between text-xs text-gray-500">
-                                            <span>Slow</span>
-                                            <span>Fast</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1">Controls</label>
-                                        <div class="space-y-2">
-                                            <div class="flex items-center">
-                                                <input type="checkbox" id="invert-controls" class="mr-2">
-                                                <label for="invert-controls">Invert Controls</label>
+                                    <div class="w-full md:w-2/3">
+                                        <form id="password-form" class="space-y-4">
+                                            <div class="form-group">
+                                                <label for="current_password" class="block text-sm font-medium text-gray-700">Current Password</label>
+                                                <input 
+                                                    type="password" 
+                                                    id="current_password" 
+                                                    name="current_password" 
+                                                    placeholder="••••••••"
+                                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                                />
                                             </div>
-                                            <div class="flex items-center">
-                                                <input type="checkbox" id="enable-sound" checked class="mr-2">
-                                                <label for="enable-sound">Enable Sound</label>
+
+                                            <div class="form-group mt-4">
+                                                <label for="new_password" class="block text-sm font-medium text-gray-700">New Password</label>
+                                                <input 
+                                                    type="password" 
+                                                    id="new_password" 
+                                                    name="new_password" 
+                                                    placeholder="••••••••"
+                                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                                />
                                             </div>
-                                            <div class="flex items-center">
-                                                <input type="checkbox" id="enable-music" checked class="mr-2">
-                                                <label for="enable-music">Enable Music</label>
+
+                                            <div class="form-group mt-4">
+                                                <label for="confirm_password" class="block text-sm font-medium text-gray-700">Confirm Password</label>
+                                                <input 
+                                                    type="password" 
+                                                    id="confirm_password" 
+                                                    name="confirm_password" 
+                                                    placeholder="••••••••"
+                                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                                />
                                             </div>
-                                        </div>
+
+                                            <div class="mt-6">
+                                                <button 
+                                                    type="submit"
+                                                    class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                                                >
+                                                    Change Password
+                                                </button>
+                                            </div>
+                                        </form>
                                     </div>
-                                    
-                                    <div class="flex justify-end">
-                                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded transition duration-200">
-                                            Save Changes
-                                        </button>
-                                    </div>
-                                </form>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    `;
 
-    // Add event listeners for tab switching
-    const tabs = ['account', 'game', 'appearance', 'notifications'];
-    tabs.forEach(tab => {
-        const button = container.querySelector(`#${tab}-tab-btn`);
-        const content = container.querySelector(`#${tab}-tab`);
+                <div id="status-message" class="mt-4 p-4 rounded hidden"></div>
+            </div>
+        `;
+
+        // Initialize avatar upload
+        const avatarContainer = document.getElementById('avatar-container');
+        if (avatarContainer instanceof HTMLElement) {
+            this.avatarUpload = new AvatarUpload({
+                container: avatarContainer,
+                currentAvatar: this.originalValues.avatar_url,
+                onPendingChange: (hasPendingChanges) => {
+                    console.log('🔍 DEBUG: Avatar pending changes:', hasPendingChanges);
+                    this.updateProfileFormState(hasPendingChanges);
+                }
+            });
+        } else {
+            console.error('Avatar container not found');
+        }
+
+        // Set up form submissions
+        const profileForm = document.getElementById('profile-form') as HTMLFormElement;
+        const accountForm = document.getElementById('account-form') as HTMLFormElement;
+        const passwordForm = document.getElementById('password-form') as HTMLFormElement;
+        const cancelProfileBtn = document.getElementById('cancel-profile-btn');
+
+        // Set up event listeners for forms
+        profileForm?.addEventListener('submit', this.handleProfileFormSubmit.bind(this));
+        accountForm?.addEventListener('submit', this.handleAccountFormSubmit.bind(this));
+        passwordForm?.addEventListener('submit', this.handlePasswordFormSubmit.bind(this));
         
-        if (button && content) {
-            button.addEventListener('click', () => {
-                // Hide all tabs
-                tabs.forEach(t => {
-                    const tabContent = container.querySelector(`#${t}-tab`);
-                    const tabButton = container.querySelector(`#${t}-tab-btn`);
-                    if (tabContent) {
-                        tabContent.classList.add('hidden');
-                    }
-                    if (tabButton) {
-                        tabButton.classList.remove('bg-blue-500', 'text-white');
-                        tabButton.classList.add('hover:bg-gray-200');
-                    }
-                });
-                
-                // Show selected tab
-                content.classList.remove('hidden');
-                button.classList.add('bg-blue-500', 'text-white');
-                button.classList.remove('hover:bg-gray-200');
+        // Set up event listener for cancel button
+        cancelProfileBtn?.addEventListener('click', this.handleProfileCancel.bind(this));
+        
+        // Set up event listener for display name changes
+        const displayNameInput = document.getElementById('display_name') as HTMLInputElement;
+        if (displayNameInput) {
+            displayNameInput.addEventListener('input', () => {
+                const hasNameChanges = displayNameInput.value !== (this.originalValues?.display_name || '');
+                const hasAvatarChanges = this.avatarUpload?.hasPendingChanges() || false;
+                this.updateProfileFormState(hasNameChanges || hasAvatarChanges);
             });
         }
-    });
+    }
 
-    // Handle avatar upload
-    const avatarUpload = container.querySelector('#avatar-upload') as HTMLInputElement;
-    if (avatarUpload) {
-        avatarUpload.addEventListener('change', async (e) => {
-            const file = (e.target as HTMLInputElement).files?.[0];
-            if (file) {
-                try {
-                    const formData = new FormData();
-                    formData.append('avatar', file);
-                    await authService.updateAvatar(formData);
-                    // Refresh the page to show the new avatar
-                    renderSettingsPage(container);
-                } catch (error) {
-                    console.error('Failed to upload avatar:', error);
-                    alert('Failed to upload avatar. Please try again.');
+    private updateProfileFormState(hasChanges: boolean): void {
+        this.hasProfileChanges = hasChanges;
+        
+        const saveButton = document.getElementById('save-profile-btn') as HTMLButtonElement;
+        const cancelButton = document.getElementById('cancel-profile-btn') as HTMLButtonElement;
+        
+        if (saveButton) {
+            saveButton.disabled = !hasChanges;
+        }
+        
+        if (cancelButton) {
+            cancelButton.classList.toggle('hidden', !hasChanges);
+        }
+    }
+    
+    private handleProfileCancel(): void {
+        // Discard avatar changes
+        if (this.avatarUpload) {
+            this.avatarUpload.discardChanges();
+        }
+        
+        // Reset display name input
+        const displayNameInput = document.getElementById('display_name') as HTMLInputElement;
+        if (displayNameInput && this.originalValues) {
+            displayNameInput.value = this.originalValues.display_name || '';
+        }
+        
+        // Update form state
+        this.updateProfileFormState(false);
+    }
+
+    private setupTabSwitching(): void {
+        const tabs = [
+            { id: 'profile-tab', content: 'profile-content' },
+            { id: 'account-tab', content: 'account-content' },
+            { id: 'password-tab', content: 'password-content' }
+        ];
+
+        tabs.forEach(tab => {
+            const tabButton = document.getElementById(tab.id);
+            tabButton?.addEventListener('click', () => {
+                // Check for unsaved changes
+                if (this.hasProfileChanges && this.activeTab === 'profile') {
+                    if (!confirm('You have unsaved changes. Are you sure you want to leave this tab?')) {
+                        return;
+                    }
+                    // Discard changes if user confirms
+                    this.handleProfileCancel();
                 }
-            }
+                
+                // Hide all content
+                tabs.forEach(t => {
+                    const content = document.getElementById(t.content);
+                    const button = document.getElementById(t.id);
+                    
+                    if (content) content.classList.add('hidden');
+                    
+                    if (button) {
+                        button.classList.remove('border-blue-500', 'text-blue-600');
+                        button.classList.add('border-transparent', 'text-gray-500');
+                    }
+                });
+
+                // Show selected content
+                const selectedContent = document.getElementById(tab.content);
+                if (selectedContent) {
+                    selectedContent.classList.remove('hidden');
+                }
+
+                // Update tab appearance
+                if (tabButton) {
+                    tabButton.classList.remove('border-transparent', 'text-gray-500');
+                    tabButton.classList.add('border-blue-500', 'text-blue-600');
+                }
+
+                // Update active tab
+                const tabName = tab.id.split('-')[0] as 'profile' | 'account' | 'password';
+                this.activeTab = tabName;
+            });
         });
     }
 
-    // Handle account form submission
-    const accountForm = container.querySelector('#account-form') as HTMLFormElement;
-    if (accountForm) {
-        accountForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const username = (container.querySelector('#username') as HTMLInputElement).value;
-            const displayName = (container.querySelector('#display-name') as HTMLInputElement).value;
-            const email = (container.querySelector('#email') as HTMLInputElement).value;
-            const currentPassword = (container.querySelector('#current-password') as HTMLInputElement).value;
-            const newPassword = (container.querySelector('#new-password') as HTMLInputElement).value;
-            const confirmPassword = (container.querySelector('#confirm-password') as HTMLInputElement).value;
-
-            try {
-                if (newPassword && newPassword !== confirmPassword) {
-                    throw new Error('New passwords do not match');
+    private async handleProfileFormSubmit(event: Event): Promise<void> {
+        event.preventDefault();
+        
+        const form = event.target as HTMLFormElement;
+        const formData = new FormData(form);
+        const displayName = formData.get('display_name') as string;
+        const saveButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+        
+        if (saveButton) {
+            saveButton.disabled = true;
+            saveButton.textContent = 'Saving...';
+        }
+        
+        try {
+            // First, save avatar if there are pending changes
+            if (this.avatarUpload?.hasPendingChanges()) {
+                const avatarSaveSuccess = await this.avatarUpload.saveChanges();
+                if (!avatarSaveSuccess) {
+                    throw new Error('Failed to save avatar');
                 }
-
-                await authService.updateProfile({
-                    username,
-                    display_name: displayName,
-                    email,
-                    current_password: currentPassword,
-                    new_password: newPassword || undefined
+            }
+            
+            // Then save display name if it changed
+            if (displayName !== (this.originalValues?.display_name || '')) {
+                const response = await AuthService.updateUserData({
+                    display_name: displayName
                 });
 
-                // Get the updated user data
-                const updatedUser = authService.getCurrentUser();
-                if (updatedUser) {
-                    // Update form fields with the new user data
-                    const usernameInput = container.querySelector('#username') as HTMLInputElement;
-                    const displayNameInput = container.querySelector('#display-name') as HTMLInputElement;
-                    const emailInput = container.querySelector('#email') as HTMLInputElement;
-                    
-                    if (usernameInput) usernameInput.value = updatedUser.username;
-                    if (displayNameInput) displayNameInput.value = updatedUser.display_name || '';
-                    if (emailInput) emailInput.value = updatedUser.email;
-
-                    // Clear password fields
-                    const currentPasswordInput = container.querySelector('#current-password') as HTMLInputElement;
-                    const newPasswordInput = container.querySelector('#new-password') as HTMLInputElement;
-                    const confirmPasswordInput = container.querySelector('#confirm-password') as HTMLInputElement;
-                    
-                    if (currentPasswordInput) currentPasswordInput.value = '';
-                    if (newPasswordInput) newPasswordInput.value = '';
-                    if (confirmPasswordInput) confirmPasswordInput.value = '';
-
-                    // Force navigation header to update
-                    const navContainer = document.querySelector('nav');
-                    if (navContainer) {
-                        document.dispatchEvent(new CustomEvent('auth-state-changed', {
-                            detail: { authenticated: true, updatedFields: ['username', 'display_name', 'email'] }
-                        }));
-                        
-                        // Also try to update the UI directly
-                        const usernameElem = document.querySelector('.username');
-                        const userEmailSpan = document.querySelector('.user-email');
-                        const avatarInitial = document.querySelector('.avatar-initial');
-                        
-                        // Update username display if it was changed
-                        if (usernameElem && updatedUser.username) {
-                            usernameElem.textContent = updatedUser.username;
-                        }
-                        
-                        // Update display name if it was changed
-                        if (userEmailSpan) {
-                            const defaultDisplayName = `Player ${updatedUser.id}`;
-                            userEmailSpan.textContent = updatedUser.display_name || defaultDisplayName;
-                        }
-                        
-                        // Update avatar initial using display name or username
-                        if (avatarInitial) {
-                            const initialSource = updatedUser.display_name || updatedUser.username;
-                            avatarInitial.textContent = initialSource.charAt(0).toUpperCase();
-                        }
+                if (response.success) {
+                    // Update original values
+                    if (this.originalValues) {
+                        this.originalValues.display_name = displayName;
                     }
 
-                    alert('Profile updated successfully!');
+                    // Update localStorage
+                    const userData = localStorage.getItem('user_data');
+                    if (userData) {
+                        const parsedData = JSON.parse(userData);
+                        parsedData.display_name = displayName;
+                        localStorage.setItem('user_data', JSON.stringify(parsedData));
+                    }
+
+                    // Trigger auth state change
+                    document.dispatchEvent(new CustomEvent('auth-state-changed', {
+                        detail: { 
+                            authenticated: true,
+                            updatedFields: ['display_name']
+                        }
+                    }));
                 }
-            } catch (error) {
-                console.error('Failed to update profile:', error);
-                alert(error.message || 'Failed to update profile. Please try again.');
             }
-        });
+
+            this.showSuccess('Profile information updated successfully');
+            this.updateProfileFormState(false);
+        } catch (error) {
+            console.error('Failed to update profile:', error);
+            this.showError(error instanceof Error ? error.message : 'Failed to update profile');
+        } finally {
+            if (saveButton) {
+                saveButton.disabled = false;
+                saveButton.textContent = 'Save Profile';
+            }
+        }
     }
 
-    // Handle game settings form submission
-    const gameSettingsForm = container.querySelector('#game-settings-form') as HTMLFormElement;
-    if (gameSettingsForm) {
-        gameSettingsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const difficulty = (container.querySelector('#difficulty') as HTMLSelectElement).value;
-            const gameSpeed = (container.querySelector('#game-speed') as HTMLInputElement).value;
-            const invertControls = (container.querySelector('#invert-controls') as HTMLInputElement).checked;
-            const enableSound = (container.querySelector('#enable-sound') as HTMLInputElement).checked;
-            const enableMusic = (container.querySelector('#enable-music') as HTMLInputElement).checked;
+    private async handleAccountFormSubmit(event: Event): Promise<void> {
+        event.preventDefault();
+        
+        const form = event.target as HTMLFormElement;
+        const formData = new FormData(form);
+        const username = formData.get('username') as string;
+        const email = formData.get('email') as string;
+        
+        try {
+            const response = await AuthService.updateUserData({
+                username: username,
+                email: email
+            });
 
-            try {
-                await authService.updateGameSettings({
-                    difficulty,
-                    game_speed: parseInt(gameSpeed),
-                    invert_controls: invertControls,
-                    enable_sound: enableSound,
-                    enable_music: enableMusic
-                });
+            if (response.success) {
+                // Update original values
+                if (this.originalValues) {
+                    this.originalValues.username = username;
+                    this.originalValues.email = email;
+                }
 
-                alert('Game settings updated successfully!');
-            } catch (error) {
-                console.error('Failed to update game settings:', error);
-                alert('Failed to update game settings. Please try again.');
+                // Update localStorage
+                const userData = localStorage.getItem('user_data');
+                if (userData) {
+                    const parsedData = JSON.parse(userData);
+                    parsedData.username = username;
+                    parsedData.email = email;
+                    localStorage.setItem('user_data', JSON.stringify(parsedData));
+                }
+
+                // Trigger auth state change 
+                document.dispatchEvent(new CustomEvent('auth-state-changed', {
+                    detail: { 
+                        authenticated: true,
+                        updatedFields: ['username', 'email']
+                    }
+                }));
+
+                this.showSuccess('Account information updated successfully');
             }
-        });
+        } catch (error) {
+            console.error('Failed to update account:', error);
+            this.showError(error instanceof Error ? error.message : 'Failed to update account');
+        }
+    }
+
+    private async handlePasswordFormSubmit(event: Event): Promise<void> {
+        event.preventDefault();
+        
+        const form = event.target as HTMLFormElement;
+        const formData = new FormData(form);
+        
+        const currentPassword = formData.get('current_password') as string;
+        const newPassword = formData.get('new_password') as string;
+        const confirmPassword = formData.get('confirm_password') as string;
+        
+        // Perform validation
+        if (!currentPassword) {
+            this.showError('Current password is required');
+            return;
+        }
+        
+        if (!newPassword) {
+            this.showError('New password is required');
+            return;
+        }
+        
+        if (newPassword !== confirmPassword) {
+            this.showError('New passwords do not match');
+            return;
+        }
+        
+        try {
+            const response = await AuthService.updatePassword(currentPassword, newPassword);
+
+            if (response.success) {
+                // Clear password fields
+                (form.querySelector('#current_password') as HTMLInputElement).value = '';
+                (form.querySelector('#new_password') as HTMLInputElement).value = '';
+                (form.querySelector('#confirm_password') as HTMLInputElement).value = '';
+                
+                this.showSuccess('Password updated successfully');
+            }
+        } catch (error) {
+            console.error('Failed to update password:', error);
+            this.showError(error instanceof Error ? error.message : 'Failed to update password');
+        }
+    }
+
+    private showError(message: string): void {
+        const statusDiv = document.getElementById('status-message');
+        if (statusDiv) {
+            statusDiv.textContent = message;
+            statusDiv.classList.remove('hidden', 'bg-green-100', 'text-green-800');
+            statusDiv.classList.add('bg-red-100', 'text-red-800');
+        }
+    }
+
+    private showSuccess(message: string): void {
+        const statusDiv = document.getElementById('status-message');
+        if (statusDiv) {
+            statusDiv.textContent = message;
+            statusDiv.classList.remove('hidden', 'bg-red-100', 'text-red-800');
+            statusDiv.classList.add('bg-green-100', 'text-green-800');
+            
+            // Hide after 5 seconds
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+            }, 5000);
+        }
     }
 } 
