@@ -4,6 +4,8 @@
 export function formatDateTime(dateString: string): string {
     // SQLite timestamps are in UTC format
     const date = new Date(dateString + 'Z');
+    // Add 8 hours to the timestamp
+    date.setHours(date.getHours() + 8);
     return date.toLocaleString(undefined, {
         year: 'numeric',
         month: 'numeric',
@@ -21,6 +23,8 @@ export function formatDateTime(dateString: string): string {
 export function formatRelativeTime(dateString: string): string {
     // SQLite timestamps are in UTC format
     const date = new Date(dateString + 'Z');
+    // Add 8 hours to the timestamp
+    date.setHours(date.getHours() + 8);
     const now = new Date();
     
     // Get the time difference in minutes
@@ -28,8 +32,7 @@ export function formatRelativeTime(dateString: string): string {
     const diffMins = Math.floor(diffMs / 60000);
     
     // Log for debugging
-    console.log('Last seen date (UTC):', dateString);
-    console.log('Parsed date:', date.toISOString());
+    console.log('Last seen date (UTC+8):', date.toISOString());
     console.log('Current date:', now.toISOString());
     console.log('Difference in minutes:', diffMins);
     

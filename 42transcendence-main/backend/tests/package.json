@@ -1,9 +1,0 @@
-{
-  "name": "ft-transcendence-tests",
-  "version": "1.0.0",
-  "description": "Tests for 42 Transcendence Pong Game",
-  "type": "module",
-  "dependencies": {
-    "node-fetch": "^3.3.2"
-  }
-} 

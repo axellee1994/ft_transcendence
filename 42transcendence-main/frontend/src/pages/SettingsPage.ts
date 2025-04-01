@@ -1,45 +1,38 @@
 import { AuthService } from '../services/auth';
 import { AvatarUpload } from '../components/AvatarUpload';
 
-export class SettingsPage {
-    private container: HTMLElement;
-    private avatarUpload: AvatarUpload | null = null;
-    private originalValues: {
-        username: string;
-        display_name: string;
-        email: string;
-        avatar_url: string;
-    } | null = null;
-    private activeTab: 'profile' | 'account' | 'password' = 'profile';
-    private hasProfileChanges: boolean = false;
-
-    constructor(container: HTMLElement) {
-        this.container = container;
-        this.initialize();
-    }
-
-    private async initialize(): Promise<void> {
+// Export a render function instead of a class, to match other components
+export function renderSettingsPage(container: HTMLElement): void {
+    const initialize = async () => {
         try {
-            // Get current user data
-            const userData = localStorage.getItem('user_data');
-            if (!userData) {
-                throw new Error('User data not found');
+            // Get current user data from AuthService
+            const authService = AuthService.getInstance();
+            const currentUser = authService.getCurrentUser();
+            
+            if (!currentUser) {
+                showError('User data not found');
+                return;
             }
 
-            this.originalValues = JSON.parse(userData);
-            await this.renderSettingsPage();
-            this.setupTabSwitching();
+            const originalValues = {
+                username: currentUser.username || '',
+                display_name: currentUser.display_name || '',
+                email: currentUser.email || '',
+                avatar_url: currentUser.avatar_url || ''
+            };
+            
+            await renderSettingsUI(originalValues);
+            setupTabSwitching();
+            setupEventListeners(originalValues);
 
         } catch (error) {
             console.error('Failed to initialize settings page:', error);
-            this.showError('Failed to load settings. Please try again later.');
+            showError('Failed to load settings. Please try again later.');
         }
-    }
+    };
 
-    private async renderSettingsPage(): Promise<void> {
-        if (!this.originalValues) return;
-
-        this.container.innerHTML = `
+    const renderSettingsUI = async (originalValues: any) => {
+        container.innerHTML = `
             <div class="settings-page p-6 max-w-6xl mx-auto">
                 <h1 class="text-2xl font-bold mb-6">Account Settings</h1>
                 
@@ -56,7 +49,7 @@ export class SettingsPage {
                             Password
                         </button>
                     </div>
-
+                        
                     <!-- Tab Content -->
                     <div class="p-6">
                         <!-- Profile Tab -->
@@ -83,7 +76,7 @@ export class SettingsPage {
                                                     type="text" 
                                                     id="display_name" 
                                                     name="display_name" 
-                                                    value="${this.originalValues.display_name || ''}"
+                                                    value="${originalValues.display_name || ''}"
                                                     placeholder="How you want to be known"
                                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                                 />
@@ -114,7 +107,7 @@ export class SettingsPage {
                                 </div>
                             </div>
                         </div>
-
+                                    
                         <!-- Account Tab -->
                         <div id="account-content" class="tab-content hidden">
                             <div class="space-y-6">
@@ -131,28 +124,28 @@ export class SettingsPage {
                                                     type="text" 
                                                     id="username" 
                                                     name="username" 
-                                                    value="${this.originalValues.username}"
+                                                    value="${originalValues.username}"
                                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                                 />
                                                 <p class="mt-1 text-sm text-gray-500">
                                                     This is your unique identifier on the platform
                                                 </p>
                                             </div>
-
+                                    
                                             <div class="form-group mt-4">
                                                 <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
                                                 <input 
                                                     type="email" 
                                                     id="email" 
                                                     name="email" 
-                                                    value="${this.originalValues.email}"
+                                                    value="${originalValues.email}"
                                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                                 />
                                                 <p class="mt-1 text-sm text-gray-500">
                                                     We'll never share your email with anyone else
                                                 </p>
                                             </div>
-
+                                    
                                             <div class="mt-6">
                                                 <button 
                                                     type="submit"
@@ -166,7 +159,7 @@ export class SettingsPage {
                                 </div>
                             </div>
                         </div>
-
+                                    
                         <!-- Password Tab -->
                         <div id="password-content" class="tab-content hidden">
                             <div class="space-y-6">
@@ -209,7 +202,7 @@ export class SettingsPage {
                                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                                 />
                                             </div>
-
+                                    
                                             <div class="mt-6">
                                                 <button 
                                                     type="submit"
@@ -233,18 +226,23 @@ export class SettingsPage {
         // Initialize avatar upload
         const avatarContainer = document.getElementById('avatar-container');
         if (avatarContainer instanceof HTMLElement) {
-            this.avatarUpload = new AvatarUpload({
+            const avatarUpload = new AvatarUpload({
                 container: avatarContainer,
-                currentAvatar: this.originalValues.avatar_url,
+                currentAvatar: originalValues.avatar_url,
                 onPendingChange: (hasPendingChanges) => {
                     console.log('🔍 DEBUG: Avatar pending changes:', hasPendingChanges);
-                    this.updateProfileFormState(hasPendingChanges);
+                    updateProfileFormState(hasPendingChanges);
                 }
             });
+            // Store the instance on the container for later access
+            (avatarContainer as any)._avatarUpload = avatarUpload;
         } else {
             console.error('Avatar container not found');
         }
+    };
 
+    // Helper functions
+    const setupEventListeners = (originalValues: any) => {
         // Set up form submissions
         const profileForm = document.getElementById('profile-form') as HTMLFormElement;
         const accountForm = document.getElementById('account-form') as HTMLFormElement;
@@ -252,29 +250,32 @@ export class SettingsPage {
         const cancelProfileBtn = document.getElementById('cancel-profile-btn');
 
         // Set up event listeners for forms
-        profileForm?.addEventListener('submit', this.handleProfileFormSubmit.bind(this));
-        accountForm?.addEventListener('submit', this.handleAccountFormSubmit.bind(this));
-        passwordForm?.addEventListener('submit', this.handlePasswordFormSubmit.bind(this));
+        profileForm?.addEventListener('submit', handleProfileFormSubmit);
+        accountForm?.addEventListener('submit', handleAccountFormSubmit);
+        passwordForm?.addEventListener('submit', handlePasswordFormSubmit);
         
         // Set up event listener for cancel button
-        cancelProfileBtn?.addEventListener('click', this.handleProfileCancel.bind(this));
+        cancelProfileBtn?.addEventListener('click', handleProfileCancel);
         
         // Set up event listener for display name changes
         const displayNameInput = document.getElementById('display_name') as HTMLInputElement;
         if (displayNameInput) {
             displayNameInput.addEventListener('input', () => {
-                const hasNameChanges = displayNameInput.value !== (this.originalValues?.display_name || '');
-                const hasAvatarChanges = this.avatarUpload?.hasPendingChanges() || false;
-                this.updateProfileFormState(hasNameChanges || hasAvatarChanges);
+                const hasNameChanges = displayNameInput.value !== (originalValues?.display_name || '');
+                // Cannot access AvatarUpload instance directly in this structure, 
+                // will handle changes through the onPendingChange callback
+                updateProfileFormState(hasNameChanges);
             });
         }
-    }
+    };
 
-    private updateProfileFormState(hasChanges: boolean): void {
-        this.hasProfileChanges = hasChanges;
+    let hasProfileChanges = false;
+
+    const updateProfileFormState = (hasChanges: boolean): void => {
+        hasProfileChanges = hasChanges;
         
         const saveButton = document.getElementById('save-profile-btn') as HTMLButtonElement;
-        const cancelButton = document.getElementById('cancel-profile-btn') as HTMLButtonElement;
+        const cancelButton = document.getElementById('cancel-profile-btn');
         
         if (saveButton) {
             saveButton.disabled = !hasChanges;
@@ -283,25 +284,20 @@ export class SettingsPage {
         if (cancelButton) {
             cancelButton.classList.toggle('hidden', !hasChanges);
         }
-    }
-    
-    private handleProfileCancel(): void {
-        // Discard avatar changes
-        if (this.avatarUpload) {
-            this.avatarUpload.discardChanges();
-        }
-        
+    };
+
+    const handleProfileCancel = (): void => {
         // Reset display name input
         const displayNameInput = document.getElementById('display_name') as HTMLInputElement;
-        if (displayNameInput && this.originalValues) {
-            displayNameInput.value = this.originalValues.display_name || '';
+        if (displayNameInput) {
+            displayNameInput.value = '';
         }
         
         // Update form state
-        this.updateProfileFormState(false);
-    }
+        updateProfileFormState(false);
+    };
 
-    private setupTabSwitching(): void {
+    const setupTabSwitching = (): void => {
         const tabs = [
             { id: 'profile-tab', content: 'profile-content' },
             { id: 'account-tab', content: 'account-content' },
@@ -311,15 +307,6 @@ export class SettingsPage {
         tabs.forEach(tab => {
             const tabButton = document.getElementById(tab.id);
             tabButton?.addEventListener('click', () => {
-                // Check for unsaved changes
-                if (this.hasProfileChanges && this.activeTab === 'profile') {
-                    if (!confirm('You have unsaved changes. Are you sure you want to leave this tab?')) {
-                        return;
-                    }
-                    // Discard changes if user confirms
-                    this.handleProfileCancel();
-                }
-                
                 // Hide all content
                 tabs.forEach(t => {
                     const content = document.getElementById(t.content);
@@ -344,80 +331,100 @@ export class SettingsPage {
                     tabButton.classList.remove('border-transparent', 'text-gray-500');
                     tabButton.classList.add('border-blue-500', 'text-blue-600');
                 }
-
-                // Update active tab
-                const tabName = tab.id.split('-')[0] as 'profile' | 'account' | 'password';
-                this.activeTab = tabName;
             });
         });
-    }
+    };
 
-    private async handleProfileFormSubmit(event: Event): Promise<void> {
+    const handleProfileFormSubmit = async (event: Event): Promise<void> => {
         event.preventDefault();
         
         const form = event.target as HTMLFormElement;
-        const formData = new FormData(form);
-        const displayName = formData.get('display_name') as string;
-        const saveButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+        const saveButton = form.querySelector('#save-profile-btn') as HTMLButtonElement;
         
         if (saveButton) {
             saveButton.disabled = true;
             saveButton.textContent = 'Saving...';
         }
-        
+
         try {
-            // First, save avatar if there are pending changes
-            if (this.avatarUpload?.hasPendingChanges()) {
-                const avatarSaveSuccess = await this.avatarUpload.saveChanges();
-                if (!avatarSaveSuccess) {
-                    throw new Error('Failed to save avatar');
-                }
+            const formData = new FormData(form);
+            const displayName = formData.get('display_name') as string;
+            let avatarBase64: string | null = null; // Variable to hold base64 data
+
+            // Get the AvatarUpload instance
+            const avatarContainer = document.getElementById('avatar-container');
+            let avatarUploadInstance;
+            if (avatarContainer) {
+                avatarUploadInstance = (avatarContainer as any)._avatarUpload;
             }
-            
-            // Then save display name if it changed
-            if (displayName !== (this.originalValues?.display_name || '')) {
-                const response = await AuthService.updateUserData({
-                    display_name: displayName
-                });
 
-                if (response.success) {
-                    // Update original values
-                    if (this.originalValues) {
-                        this.originalValues.display_name = displayName;
-                    }
+            // If avatar has pending changes, get the base64 data
+            if (avatarUploadInstance && avatarUploadInstance.hasPendingChanges()) {
+                console.log('🔍 DEBUG: SettingsPage - Getting pending avatar base64 data');
+                avatarBase64 = await avatarUploadInstance.getPendingAvatarBase64();
+                if (!avatarBase64) {
+                    // Handle error if conversion failed (though unlikely if hasPendingChanges was true)
+                    throw new Error('Failed to convert avatar to base64');
+                }
+                 // Clear the pending state in AvatarUpload after getting the data
+                 // Note: saveChanges() now primarily clears state.
+                 await avatarUploadInstance.saveChanges(); 
+            }
 
-                    // Update localStorage
-                    const userData = localStorage.getItem('user_data');
-                    if (userData) {
-                        const parsedData = JSON.parse(userData);
-                        parsedData.display_name = displayName;
-                        localStorage.setItem('user_data', JSON.stringify(parsedData));
-                    }
+            // Prepare the combined payload for the API call
+            const updatePayload: { display_name?: string; avatar_base64?: string } = {};
+            // Only include fields if they have actually changed or are present
+            // Check originalValues to see if display_name changed
+            const authService = AuthService.getInstance();
+            const originalValues = authService.getCurrentUser(); // Assuming this holds original values
+            if (originalValues && displayName !== originalValues.display_name) {
+                 updatePayload.display_name = displayName;
+            }
+            if (avatarBase64) {
+                 updatePayload.avatar_base64 = avatarBase64;
+            }
 
-                    // Trigger auth state change
+            // Only call API if there's something to update
+            if (Object.keys(updatePayload).length > 0) {
+                 console.log('🔍 DEBUG: SettingsPage - Calling AuthService.updateUserData with payload:', updatePayload);
+                 // Update profile data (including avatar if present)
+                 const response = await AuthService.updateUserData(updatePayload);
+    
+                 if (response.success) {
+                    // Trigger auth state change with updated fields
+                    const updatedFields = Object.keys(updatePayload).map(key => 
+                        key === 'avatar_base64' ? 'avatar_url' : key
+                    );
                     document.dispatchEvent(new CustomEvent('auth-state-changed', {
                         detail: { 
                             authenticated: true,
-                            updatedFields: ['display_name']
+                            updatedFields: updatedFields
                         }
                     }));
-                }
+                    showSuccess('Profile information updated successfully');
+                 } else {
+                     // Throw generic error if AuthService indicates failure
+                     // The specific error might be logged within AuthService or the backend
+                     throw new Error('Failed to update user data'); 
+                 }
+            } else {
+                console.log('🔍 DEBUG: SettingsPage - No changes detected to save.');
+                 showSuccess('No changes to save.'); // Or just do nothing
             }
-
-            this.showSuccess('Profile information updated successfully');
-            this.updateProfileFormState(false);
+            
+            updateProfileFormState(false); // Reset form state regardless of API call
         } catch (error) {
             console.error('Failed to update profile:', error);
-            this.showError(error instanceof Error ? error.message : 'Failed to update profile');
+            showError(error instanceof Error ? error.message : 'Failed to update profile');
         } finally {
             if (saveButton) {
                 saveButton.disabled = false;
                 saveButton.textContent = 'Save Profile';
             }
         }
-    }
+    };
 
-    private async handleAccountFormSubmit(event: Event): Promise<void> {
+    const handleAccountFormSubmit = async (event: Event): Promise<void> => {
         event.preventDefault();
         
         const form = event.target as HTMLFormElement;
@@ -432,20 +439,7 @@ export class SettingsPage {
             });
 
             if (response.success) {
-                // Update original values
-                if (this.originalValues) {
-                    this.originalValues.username = username;
-                    this.originalValues.email = email;
-                }
-
-                // Update localStorage
-                const userData = localStorage.getItem('user_data');
-                if (userData) {
-                    const parsedData = JSON.parse(userData);
-                    parsedData.username = username;
-                    parsedData.email = email;
-                    localStorage.setItem('user_data', JSON.stringify(parsedData));
-                }
+                // AuthService handles user data persistence
 
                 // Trigger auth state change 
                 document.dispatchEvent(new CustomEvent('auth-state-changed', {
@@ -455,15 +449,15 @@ export class SettingsPage {
                     }
                 }));
 
-                this.showSuccess('Account information updated successfully');
+                showSuccess('Account information updated successfully');
             }
         } catch (error) {
             console.error('Failed to update account:', error);
-            this.showError(error instanceof Error ? error.message : 'Failed to update account');
+            showError(error instanceof Error ? error.message : 'Failed to update account');
         }
-    }
+    };
 
-    private async handlePasswordFormSubmit(event: Event): Promise<void> {
+    const handlePasswordFormSubmit = async (event: Event): Promise<void> => {
         event.preventDefault();
         
         const form = event.target as HTMLFormElement;
@@ -475,17 +469,17 @@ export class SettingsPage {
         
         // Perform validation
         if (!currentPassword) {
-            this.showError('Current password is required');
+            showError('Current password is required');
             return;
         }
         
         if (!newPassword) {
-            this.showError('New password is required');
+            showError('New password is required');
             return;
         }
         
         if (newPassword !== confirmPassword) {
-            this.showError('New passwords do not match');
+            showError('New passwords do not match');
             return;
         }
         
@@ -498,24 +492,24 @@ export class SettingsPage {
                 (form.querySelector('#new_password') as HTMLInputElement).value = '';
                 (form.querySelector('#confirm_password') as HTMLInputElement).value = '';
                 
-                this.showSuccess('Password updated successfully');
+                showSuccess('Password updated successfully');
             }
         } catch (error) {
             console.error('Failed to update password:', error);
-            this.showError(error instanceof Error ? error.message : 'Failed to update password');
+            showError(error instanceof Error ? error.message : 'Failed to update password');
         }
-    }
+    };
 
-    private showError(message: string): void {
+    const showError = (message: string): void => {
         const statusDiv = document.getElementById('status-message');
         if (statusDiv) {
             statusDiv.textContent = message;
             statusDiv.classList.remove('hidden', 'bg-green-100', 'text-green-800');
             statusDiv.classList.add('bg-red-100', 'text-red-800');
         }
-    }
+    };
 
-    private showSuccess(message: string): void {
+    const showSuccess = (message: string): void => {
         const statusDiv = document.getElementById('status-message');
         if (statusDiv) {
             statusDiv.textContent = message;
@@ -527,5 +521,8 @@ export class SettingsPage {
                 statusDiv.classList.add('hidden');
             }, 5000);
         }
-    }
+    };
+
+    // Initialize the page
+    initialize();
 } 

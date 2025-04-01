@@ -3,20 +3,44 @@ import { initRouter, registerRoute } from './router';
 import { renderHomePage } from './pages/HomePage';
 import { renderGamePage } from './pages/GamePage';
 import { renderProfilePage } from './pages/ProfilePage';
-import { renderLeaderboardPage } from './pages/LeaderboardPage';
-import { SettingsPage } from './pages/SettingsPage';
+import { renderStatsPage } from './pages/StatsPage';
+import { renderSettingsPage } from './pages/SettingsPage';
 import { renderFriendsPage } from './pages/FriendsPage';
 import { renderFriendSearchPage } from './pages/FriendSearchPage';
+import { renderTournamentPage } from './pages/TournamentPage';
 import { Layout } from './components/Layout';
 import './styles.css';
-import { UserProfile } from './components/UserProfile';
 
-// Clear localStorage in development mode when the app starts
-if (window.location.hostname === 'localhost') {
-    console.log('Development mode detected, clearing localStorage...');
-    localStorage.clear();
-    console.log('localStorage cleared');
+// IMPORTANT: We're using the routing system defined in src/router.ts
+// The routing system in src/routes/routeDefinitions.ts is disabled
+// If you need to add new routes, add them here using registerRoute()
+
+// Browser compatibility check
+function checkBrowserCompatibility() {
+    const ua = navigator.userAgent;
+    const isFirefox = ua.includes('Firefox');
+    const isChrome = ua.includes('Chrome');
+    
+    if (!isFirefox && !isChrome) {
+        const warning = document.createElement('div');
+        warning.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #ffeb3b;
+            color: black;
+            text-align: center;
+            padding: 10px;
+            z-index: 9999;
+        `;
+        warning.textContent = 'For the best experience, please use Firefox or Chrome.';
+        document.body.appendChild(warning);
+    }
 }
+
+// Run compatibility check
+checkBrowserCompatibility();
 
 // Get the app container
 const appContainer = document.getElementById('app');
@@ -47,12 +71,12 @@ registerRoute('/profile/:id', (container) => {
     renderProfilePage(layout.getContentContainer(), userId);
 }, true);
 
-registerRoute('/leaderboard', (container) => {
-    renderLeaderboardPage(layout.getContentContainer());
+registerRoute('/stats', (container) => {
+    renderStatsPage(layout.getContentContainer());
 });
 
 registerRoute('/settings', (container) => {
-    new SettingsPage(layout.getContentContainer());
+    renderSettingsPage(layout.getContentContainer());
 }, true);
 
 registerRoute('/friends', (container) => {
@@ -64,18 +88,10 @@ registerRoute('/friends/search', (container) => {
     renderFriendSearchPage(layout.getContentContainer());
 }, true);
 
+// Register the tournament page route
+registerRoute('/tournaments', (container) => {
+    renderTournamentPage(layout.getContentContainer());
+}, true);
+
 // Initialize router
 initRouter(layout.getContentContainer());
-
-// Initialize the application when the DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    // Get the root container
-    const root = document.getElementById('root');
-    if (!root) {
-        console.error('Root element not found');
-        return;
-    }
-
-    // Initialize the user profile
-    new UserProfile({ container: root });
-});

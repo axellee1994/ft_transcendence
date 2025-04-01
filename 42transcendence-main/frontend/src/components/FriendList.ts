@@ -52,21 +52,15 @@ export class FriendList {
     }
 
     private async fetchFriends(): Promise<void> {
+        const token = AuthService.getInstance().getToken();
+        if (!token) return;
+        
+        // CORRECTED PATH: /api/protected/friends/
+        const apiUrl = window.location.hostname === 'localhost' ? 
+            `http://${window.location.hostname}:4002/api/protected/friends` :
+            '/api/protected/friends';
+        
         try {
-            const token = localStorage.getItem('auth_token');
-            console.log("Using auth_token:", token ? token.substring(0, 10) + "..." : "not found");
-            
-            if (!token) {
-                this.error = 'You must be logged in to view friends';
-                this.loading = false;
-                return;
-            }
-
-            // Make sure we have the correct API URL prefix
-            const apiUrl = window.location.hostname === 'localhost' ? 
-                        `http://${window.location.hostname}:4002/api/friends` : 
-                        '/api/friends';
-            
             console.log("Fetching friends from:", apiUrl);
                         
             const response = await fetch(apiUrl, {
@@ -78,8 +72,7 @@ export class FriendList {
             if (!response.ok) {
                 if (response.status === 401) {
                     this.error = 'Your session has expired. Please log in again.';
-                    localStorage.removeItem('auth_token');
-                    localStorage.removeItem('user_data');
+                    AuthService.getInstance().logout();
                     return;
                 }
                 throw new Error(`Failed to load friends (${response.status})`);
@@ -109,17 +102,17 @@ export class FriendList {
     }
 
     private async fetchPendingRequests(): Promise<void> {
+        const token = AuthService.getInstance().getToken();
+        if (!token) return;
+        
+        // CORRECTED PATH: /api/protected/friends/pending
+        const apiUrl = window.location.hostname === 'localhost' ? 
+            `http://${window.location.hostname}:4002/api/protected/friends/pending` :
+            '/api/protected/friends/pending';
+        
         try {
-            const token = localStorage.getItem('auth_token');
-            if (!token) {
-                return;
-            }
-
-            // Make sure we have the correct API URL prefix
-            const apiUrl = window.location.hostname === 'localhost' ? 
-                        `http://${window.location.hostname}:4002/api/friends/pending` : 
-                        '/api/friends/pending';
-            
+            console.log("Fetching pending requests from:", apiUrl);
+                        
             const response = await fetch(apiUrl, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -503,7 +496,7 @@ export class FriendList {
                     buttonElement.classList.add('opacity-50');
                     buttonElement.classList.add('pointer-events-none');
                     
-                    await this.acceptFriendRequest(parseInt(userId));
+                    await this.acceptRequest(parseInt(userId));
                 }
             });
         });
@@ -529,24 +522,27 @@ export class FriendList {
                     buttonElement.classList.add('opacity-50');
                     buttonElement.classList.add('pointer-events-none');
                     
-                    await this.rejectFriendRequest(parseInt(userId));
+                    await this.rejectRequest(parseInt(userId));
                 }
             });
         });
     }
 
     private async removeFriend(userId: number): Promise<void> {
+        const token = AuthService.getInstance().getToken();
+        if (!token) return;
+        
+        // CORRECTED PATH: /api/protected/friends/:userId
+        const apiUrl = window.location.hostname === 'localhost' ? 
+            `http://${window.location.hostname}:4002/api/protected/friends/${userId}` :
+            `/api/protected/friends/${userId}`;
+
         try {
-            const token = localStorage.getItem('auth_token');
-            
-            // Make sure we have the correct API URL prefix
-            const apiUrl = window.location.hostname === 'localhost' ? 
-                        `http://${window.location.hostname}:4002/api/friends/${userId}` : 
-                        `/api/friends/${userId}`;
-                        
             const response = await fetch(apiUrl, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+                method: 'DELETE', // Correct method
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
             });
 
             if (!response.ok) {
@@ -555,30 +551,24 @@ export class FriendList {
 
             await this.refresh();
         } catch (err) {
-            console.error('Failed to remove friend:', err);
-            alert('Failed to remove friend. Please try again.');
+            console.error("Failed to remove friend:", err);
+            alert('Failed to remove friend');
         }
     }
 
-    private async acceptFriendRequest(userId: number): Promise<void> {
+    private async acceptRequest(userId: number): Promise<void> {
+        const token = AuthService.getInstance().getToken();
+        if (!token) return;
+        
+        // CORRECTED PATH: /api/protected/friends/:userId/accept
+        const apiUrl = window.location.hostname === 'localhost' ? 
+            `http://${window.location.hostname}:4002/api/protected/friends/${userId}/accept` :
+            `/api/protected/friends/${userId}/accept`;
+
         try {
-            const token = localStorage.getItem('auth_token');
-            if (!token) {
-                alert('You must be logged in to accept friend requests');
-                return;
-            }
-            
-            // Make sure we have the correct API URL prefix
-            const apiUrl = window.location.hostname === 'localhost' ? 
-                        `http://${window.location.hostname}:4002/api/friends/${userId}/accept` :
-                        `/api/friends/${userId}/accept`;
-            
-            console.log('Accepting friend request, API URL:', apiUrl);
-            console.log('Using token:', token.substring(0, 10) + "...");
-                        
             const response = await fetch(apiUrl, {
-                method: 'PUT',
-                headers: { 
+                method: 'PUT', // Correct method
+                headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
@@ -608,40 +598,24 @@ export class FriendList {
             console.log('Friend request accepted successfully');
             await this.refresh();
         } catch (err) {
-            console.error('Failed to accept friend request:', err);
-            
-            // Reset the button state for all accept buttons for this user
-            const acceptButtons = this.props.container.querySelectorAll(`.accept-request[data-user-id="${userId}"]`);
-            acceptButtons.forEach(button => {
-                const buttonElement = button as HTMLElement;
-                buttonElement.textContent = 'Accept';
-                buttonElement.classList.remove('opacity-50');
-                buttonElement.classList.remove('pointer-events-none');
-            });
-            
-            alert(`Failed to accept friend request: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            console.error("Failed to accept friend request:", err);
+            alert('Failed to accept friend request');
         }
     }
 
-    private async rejectFriendRequest(userId: number): Promise<void> {
+    private async rejectRequest(userId: number): Promise<void> {
+        const token = AuthService.getInstance().getToken();
+        if (!token) return;
+        
+        // CORRECTED PATH: /api/protected/friends/:userId/reject
+        const apiUrl = window.location.hostname === 'localhost' ? 
+            `http://${window.location.hostname}:4002/api/protected/friends/${userId}/reject` :
+            `/api/protected/friends/${userId}/reject`;
+
         try {
-            const token = localStorage.getItem('auth_token');
-            if (!token) {
-                alert('You must be logged in to reject friend requests');
-                return;
-            }
-            
-            // Make sure we have the correct API URL prefix
-            const apiUrl = window.location.hostname === 'localhost' ? 
-                        `http://${window.location.hostname}:4002/api/friends/${userId}/reject` :
-                        `/api/friends/${userId}/reject`;
-            
-            console.log('Rejecting friend request, API URL:', apiUrl);
-            console.log('Using token:', token.substring(0, 10) + "...");
-                        
             const response = await fetch(apiUrl, {
-                method: 'PUT',
-                headers: { 
+                method: 'PUT', // Correct method
+                headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
@@ -671,18 +645,8 @@ export class FriendList {
             console.log('Friend request rejected successfully');
             await this.refresh();
         } catch (err) {
-            console.error('Failed to reject friend request:', err);
-            
-            // Reset the button state for all reject buttons for this user
-            const rejectButtons = this.props.container.querySelectorAll(`.reject-request[data-user-id="${userId}"]`);
-            rejectButtons.forEach(button => {
-                const buttonElement = button as HTMLElement;
-                buttonElement.textContent = 'Reject';
-                buttonElement.classList.remove('opacity-50');
-                buttonElement.classList.remove('pointer-events-none');
-            });
-            
-            alert(`Failed to reject friend request: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            console.error("Failed to reject friend request:", err);
+            alert('Failed to reject friend request');
         }
     }
 

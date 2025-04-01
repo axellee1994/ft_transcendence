@@ -1,4 +1,4 @@
-import { API_URL } from '../services/auth';
+import { API_URL, AuthService } from '../services/auth';
 
 interface AvatarUploadOptions {
     container: HTMLElement;
@@ -29,16 +29,21 @@ export class AvatarUpload {
     }
 
     private render(): void {
-        // Default SVG avatar - same as used in Navigation
+        // Get the avatar URL, ensuring we append API_URL if it's a relative path
+        let avatarUrl = this.pendingPreviewUrl || this.currentAvatar;
+        
+        // Default SVG avatar
         const defaultAvatar = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI1MCIgZmlsbD0iIzY0OTVFRCIvPjxwYXRoIGZpbGw9IiNmZmYiIGQ9Ik03MyA2OWMtMS44LTMuNC03LjktNS42LTExLjktNi43LTQtMS4yLTEuNS0yLjYtMi43LTIuNnMtMy4xLS4xLTguMy0uMS04LjQtLjYtOS42LS42LTMuMyAxLjctNC44IDMuM2MtMS41IDEuNi41IDEzLjIuNSAxMy4yczIuNS0uOSA1LjktLjlTNTMgNzQgNTMgNzRzMS0yLjIgMi45LTIuMiAzLjctLjIgMTAgMGM2LjQuMSAxLjEgNy41IDIuMiA3LjVzNC40LS4zIDUtLjNjMy45LTIuNCAwLTEwIDAtMTB6Ii8+PHBhdGggZmlsbD0iI2ZmZiIgZD0iTTUwIDYxLjhjMTEuMSAwIDIwLjEtOS4xIDIwLjEtMjAuMyAwLTExLjItOS05LTIwLjEtOS4xLTExLjEgMC0yMC4xLTIuMS0yMC4xIDkuMXM5IDIwLjMgMjAuMSAyMC4zeiIvPjwvc3ZnPg==`;
         
-        // Get the avatar URL, ensuring we append API_URL if it's a relative path
-        let avatarUrl = this.pendingPreviewUrl || this.currentAvatar || defaultAvatar;
-        
-        // If it's a backend path like /avatars/filename.jpg, prepend the API URL base
+        // If we have an avatar URL and it's a backend path, prepend the API URL base
         if (avatarUrl && avatarUrl.startsWith('/avatars/')) {
             const baseUrl = API_URL.substring(0, API_URL.indexOf('/api'));
             avatarUrl = `${baseUrl}${avatarUrl}`;
+        }
+
+        // Use default avatar if no URL is available
+        if (!avatarUrl) {
+            avatarUrl = defaultAvatar;
         }
         
         console.log('🔍 DEBUG: AvatarUpload - Rendering with URL:', avatarUrl);
@@ -87,6 +92,21 @@ export class AvatarUpload {
             
             this.previewImg.addEventListener('error', () => {
                 console.error('🔍 DEBUG: AvatarUpload - Image failed to load:', avatarUrl);
+                // The onerror attribute will handle the fallback
+            });
+        }
+
+        // Add click handler for the upload button
+        if (this.uploadButton) {
+            this.uploadButton.addEventListener('click', () => {
+                this.fileInput?.click();
+            });
+        }
+
+        // Add change handler for the file input
+        if (this.fileInput) {
+            this.fileInput.addEventListener('change', (event) => {
+                this.handleFileSelect(event);
             });
         }
     }
@@ -141,96 +161,28 @@ export class AvatarUpload {
         this.hideError();
     }
 
+    // This method is no longer responsible for uploading directly.
+    // It might be removed or repurposed later if needed.
     public async saveChanges(): Promise<boolean> {
-        if (!this.pendingFile) return false;
+        console.warn('AvatarUpload.saveChanges() called, but upload logic is now handled by the parent component.');
+        if (!this.pendingFile) return false; // Still need to check if there was a pending file
 
-        try {
-            const formData = new FormData();
-            formData.append('avatar', this.pendingFile);
-
-            // Get auth token for authorization
-            const token = localStorage.getItem('auth_token');
-            if (!token) {
-                throw new Error('Authentication required');
-            }
-
-            const response = await fetch(`${API_URL}/users/avatar`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData,
-                credentials: 'include'
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log('🔍 DEBUG: AvatarUpload - Upload successful:', data);
-
-            // Get the avatar URL from the response
-            const avatarUrl = data.avatarUrl || data.avatar_url;
-            
-            if (!avatarUrl) {
-                console.error('🔍 DEBUG: AvatarUpload - No avatar URL in response:', data);
-                throw new Error('No avatar URL in response');
-            }
-
-            // Update the current avatar and clear pending state
-            this.currentAvatar = avatarUrl;
-            this.pendingFile = null;
-            this.pendingPreviewUrl = null;
-
-            // Update user data in localStorage with the new avatar URL
-            const userData = localStorage.getItem('user_data');
-            if (userData) {
-                const parsedData = JSON.parse(userData);
-                parsedData.avatar_url = avatarUrl;
-                localStorage.setItem('user_data', JSON.stringify(parsedData));
-                console.log('🔍 DEBUG: AvatarUpload - Updated localStorage with new avatar:', avatarUrl);
-            }
-
-            // Notify parent component
-            if (this.onAvatarUpdate) {
-                this.onAvatarUpdate(avatarUrl);
-            }
-
-            // Clear any previous errors
-            this.hideError();
-
-            // Trigger auth state change event to update UI immediately
-            document.dispatchEvent(new CustomEvent('auth-state-changed', {
-                detail: { 
-                    authenticated: true,
-                    updatedFields: ['avatar_url']
-                }
-            }));
-
-            // Force a refresh of the AuthService current user data
-            const authService = (window as any).AuthService?.getInstance?.();
-            if (authService && typeof authService.updateCurrentUserFromLocalStorage === 'function') {
-                authService.updateCurrentUserFromLocalStorage();
-            }
-
-            console.log('🔍 DEBUG: AvatarUpload - Finished avatar update process');
-            
-            // Notify parent that we no longer have pending changes
-            if (this.onPendingChange) {
-                this.onPendingChange(false);
-            }
-            
-            // Render to update UI
-            this.render();
-            
-            return true;
-
-        } catch (error) {
-            console.error('🔍 DEBUG: AvatarUpload - Upload failed:', error);
-            this.showError('Failed to upload avatar. Please try again.');
-            return false;
+        // Simulate success if there was a pending file, 
+        // actual saving happens via getPendingAvatarBase64 in the parent.
+        // We need to clear the pending state here.
+        const hadPendingFile = this.pendingFile !== null;
+        if (this.pendingPreviewUrl) {
+            URL.revokeObjectURL(this.pendingPreviewUrl);
         }
+        this.pendingFile = null;
+        this.pendingPreviewUrl = null;
+        
+        // Notify parent of change completion (assuming success)
+        if (this.onPendingChange) {
+            this.onPendingChange(false);
+        }
+        this.render(); // Re-render to remove pending state indication
+        return hadPendingFile; // Return true if we processed a pending file
     }
     
     public discardChanges(): void {
@@ -252,6 +204,29 @@ export class AvatarUpload {
     
     public hasPendingChanges(): boolean {
         return this.pendingFile !== null;
+    }
+
+    // New method to get base64 data URL from pending file
+    public getPendingAvatarBase64(): Promise<string | null> {
+        return new Promise((resolve, reject) => {
+            if (!this.pendingFile) {
+                resolve(null); // No pending file, resolve with null
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                // Resolve with the result (which should be the base64 data URL)
+                resolve(reader.result as string);
+            };
+            reader.onerror = (error) => {
+                console.error('Error reading file for base64 conversion:', error);
+                reject(error); // Reject the promise on error
+            };
+
+            // Read the file as Data URL (base64)
+            reader.readAsDataURL(this.pendingFile);
+        });
     }
 
     private showError(message: string): void {

@@ -9,7 +9,7 @@ export function renderHomePage(container: HTMLElement): void {
                     <div class="bg-blue-50 p-6 rounded-lg shadow-md max-w-sm w-full">
                         <h2 class="text-2xl font-bold text-blue-800 mb-3">Single View Mode</h2>
                         <p class="text-gray-700 mb-4">Classic pong game with a single view perspective.</p>
-                        <button onclick="window.gameMode = 'single'; navigate('/game')" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-200">
+                        <button onclick="navigate('/game?mode=single')" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-200">
                             Play Single View
                         </button>
                     </div>
@@ -17,7 +17,7 @@ export function renderHomePage(container: HTMLElement): void {
                     <div class="bg-purple-50 p-6 rounded-lg shadow-md max-w-sm w-full">
                         <h2 class="text-2xl font-bold text-purple-800 mb-3">Multi View Mode</h2>
                         <p class="text-gray-700 mb-4">Experience pong from multiple dynamic camera angles.</p>
-                        <button onclick="window.gameMode = 'multi'; navigate('/game')" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded transition duration-200">
+                        <button onclick="navigate('/game?mode=multi')" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded transition duration-200">
                             Play Multi View
                         </button>
                     </div>
@@ -32,7 +32,18 @@ export function renderHomePage(container: HTMLElement): void {
                         <li>Score points when your opponent misses</li>
                         <li>First to reach the score limit wins</li>
                     </ul>
-                    <button onclick="navigate('/about')" class="text-blue-500 hover:text-blue-700 font-medium">Learn more about the game</button>
+                </div>
+
+                <div class="bg-green-50 p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-green-800 mb-3">Bonus Game</h2>
+                            <p class="text-gray-700">Coming soon! An even better game!</p>
+                        </div>
+                        <button onclick="window.gameMode = 'bonus'; navigate('/bonus')" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded transition duration-200 cursor-not-allowed opacity-50">
+                            Coming Soon
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

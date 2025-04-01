@@ -1,7 +1,10 @@
 import { AuthModal } from '../components/AuthModal';
 import { NotificationService } from './notification';
 
-export const API_URL = 'http://localhost:4002/api';
+// Use HTTPS in production, HTTP only in development
+export const API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:4002/api'
+    : `https://${window.location.hostname}/api`;
 
 export interface LoginResponse {
     token: string;
@@ -39,6 +42,10 @@ export interface ProfileUpdateData {
 
 type AuthStateChangeCallback = (isAuthenticated: boolean) => void;
 
+// Constants for keys
+const AUTH_TOKEN_KEY = 'auth_token';
+const USER_DATA_KEY = 'user_data';
+
 export class AuthService {
     private static instance: AuthService;
     private currentUser: User | null = null;
@@ -49,16 +56,45 @@ export class AuthService {
     private listeners: ((updatedFields: string[]) => void)[] = [];
 
     private constructor() {
-        this.validateStoredToken();
+        console.log('AuthService: Initializing...');
+        this.token = localStorage.getItem(AUTH_TOKEN_KEY);
+        const userData = localStorage.getItem(USER_DATA_KEY);
+        
+        if (userData) {
+            try {
+                this.currentUser = JSON.parse(userData);
+                console.log('AuthService: Loaded user data from localStorage');
+            } catch (e) {
+                console.error('AuthService: Failed to parse user data from localStorage');
+                localStorage.removeItem(USER_DATA_KEY);
+                this.currentUser = null;
+            }
+        }
+        
+        // Perform token validation asynchronously
+        this.validateTokenAsync();
+    }
+
+    private async validateTokenAsync() {
+        console.log('AuthService: Starting token validation...');
+        try {
+            await this.validateStoredToken();
+        } catch (error) {
+            console.error('AuthService: Token validation failed:', error);
+            this.clearAuthData();
+        }
     }
 
     private async validateStoredToken() {
-        const token = localStorage.getItem('auth_token');
+        const token = localStorage.getItem(AUTH_TOKEN_KEY);
         if (!token) return;
 
         try {
-            // Try to fetch user data with the stored token
-            const response = await fetch(`${API_URL}/auth/me`, {
+            // Set the token in the instance
+            this.token = token;
+            
+            // CORRECTED PATH: Now includes /auth/
+            const response = await fetch(`${API_URL}/protected/auth/me`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -72,7 +108,13 @@ export class AuthService {
             // Token is valid, update current user
             const userData = await response.json();
             this.currentUser = userData;
-            localStorage.setItem('user_data', JSON.stringify(userData));
+            this.token = token; // Ensure token is set
+            localStorage.setItem(USER_DATA_KEY, JSON.stringify(userData));
+            
+            // Notify listeners that authentication state has changed
+            this.notifyAuthStateChange();
+            
+            console.log('Successfully validated stored token and restored session');
         } catch (error) {
             console.error('Error validating stored token:', error);
             this.clearAuthData();
@@ -82,8 +124,8 @@ export class AuthService {
     private clearAuthData(): void {
         this.currentUser = null;
         this.token = null;
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user_data');
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        localStorage.removeItem(USER_DATA_KEY);
         this.notifyAuthStateChange();
     }
 
@@ -95,6 +137,12 @@ export class AuthService {
     }
 
     private async makeAuthenticatedRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
+        if (!this.isAuthenticated()) {
+            // Token is invalid or expired
+            this.clearAuthData();
+            throw new Error('Session expired. Please log in again.');
+        }
+
         if (this.token) {
             // Start with existing headers or empty object
             const existingHeaders = options.headers as Record<string, string> || {};
@@ -112,12 +160,30 @@ export class AuthService {
             options.headers = headers;
         }
 
-        const response = await fetch(`${API_URL}${endpoint}`, options);
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({ message: 'An error occurred' }));
-            throw new Error(error.message || `HTTP error! status: ${response.status}`);
+        try {
+            const response = await fetch(`${API_URL}${endpoint}`, options);
+            
+            if (response.status === 401) {
+                // Unauthorized - token is invalid or expired
+                this.clearAuthData();
+                // Trigger notification for user
+                const notificationService = NotificationService.getInstance();
+                notificationService.showError('Your session has expired. Please log in again.');
+                // Dispatch auth state change event
+                this.notifyAuthStateChange();
+                throw new Error('Session expired. Please log in again.');
+            }
+            
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ message: 'An error occurred' }));
+                throw new Error(error.message || `HTTP error! status: ${response.status}`);
+            }
+            
+            return response.json();
+        } catch (error) {
+            console.error('API request failed:', error);
+            throw error;
         }
-        return response.json();
     }
 
     private async fetchLatestUserData(): Promise<User> {
@@ -190,7 +256,7 @@ export class AuthService {
                 console.log('🔍 Values preserved from previous data:', updatedValues.join(', '));
             }
             
-            localStorage.setItem('user_data', JSON.stringify(this.currentUser));
+            localStorage.setItem(USER_DATA_KEY, JSON.stringify(this.currentUser));
             
             return this.currentUser;
         } catch (error) {
@@ -201,84 +267,74 @@ export class AuthService {
 
     public async login(username: string, password: string): Promise<AuthResponse> {
         try {
-            console.log('🔍 Starting login process...');
+            // Simplified logging - only log on entry
+            console.log(`Attempting login for user: ${username}`);
+            
+            // Prepare request data
+            const requestData = {
+                username,
+                password
+            };
+            
+            // Make request to the API
             const response = await fetch(`${API_URL}/auth/login`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, password })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData)
             });
-
-            const responseData = await response.json();
-            console.log('🔍 Login response:', responseData);
             
+            // Handle unsuccessful response
             if (!response.ok) {
-                const errorMessage = responseData.error || 'Login failed. Please check your credentials.';
-                console.error('Login error:', errorMessage);
-                NotificationService.getInstance().showError(errorMessage);
+                // Simplified error logging - one concise message
+                console.error(`Login failed with status: ${response.status}`);
+                
+                // Try to extract error details from the response
+                let errorMessage = 'Login failed';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorData.error || 'Login failed';
+                    
+                    // Note: Not showing error notification here, will be handled in the modal
+                } catch (jsonError) {
+                    // Silent catch - no need to log parsing errors
+                }
+                
                 throw new Error(errorMessage);
             }
-
-            // Set the token first
-            this.token = responseData.token;
-            localStorage.setItem('auth_token', responseData.token);
-
-            // Set initial user data from login response
-            if (responseData.user) {
-                this.currentUser = responseData.user;
-                console.log('🔍 Initial user data from login:', this.currentUser);
-                
-                // Check and log avatar URL specifically
-                if (this.currentUser.avatar_url) {
-                    console.log('🔍 Avatar URL from login response:', this.currentUser.avatar_url);
-                } else {
-                    console.log('🔍 No avatar URL in login response - this is a first-time login or user without avatar');
-                }
-                
-                // Log the display name value as well
-                console.log('🔍 Display name from login response:', this.currentUser.display_name || 'not provided');
-                
-                // Store the user data in localStorage
-                localStorage.setItem('user_data', JSON.stringify(responseData.user));
-                
-                // Try to fetch latest user data right after login to ensure we have the most up-to-date info
-                try {
-                    const latestUserData = await this.fetchLatestUserData();
-                    console.log('🔍 Updated user data after login:', latestUserData);
-                    
-                    // Make sure we keep the display_name if it's not in the latest data but was in the initial login data
-                    if (!latestUserData.display_name && this.currentUser.display_name) {
-                        console.log('🔍 Preserving display_name from login response:', this.currentUser.display_name);
-                        this.currentUser = {
-                            ...latestUserData,
-                            display_name: this.currentUser.display_name
-                        };
-                        localStorage.setItem('user_data', JSON.stringify(this.currentUser));
-                    }
-                    
-                    // If there's still no avatar_url after fetching latest data,
-                    // we'll rely on the UI components to display the default avatar
-                } catch (error) {
-                    console.warn('Failed to fetch latest user data after login:', error);
-                    // Continue with login process even if this fails
-                }
-            } else {
-                console.error('🔍 No user data in login response:', responseData);
-                throw new Error('No user data in login response');
-            }
-
-            // Notify of auth state change
-            this.notifyAuthStateChange();
             
-            return { user: this.currentUser, token: this.token };
-        } catch (error) {
-            console.error('Login failed:', error);
-            if (!(error instanceof Error && error.message.includes('Please check your credentials') || 
-                  error.message.includes('Username not found') || 
-                  error.message.includes('Incorrect password'))) {
-                NotificationService.getInstance().showError('Network error. Please try again later.');
+            // Extract and process the login data
+            const loginData = await response.json();
+            
+            // Set token in localStorage
+            if (loginData.token) {
+                this.token = loginData.token;
+                localStorage.setItem(AUTH_TOKEN_KEY, loginData.token);
+            } else {
+                console.error('No token received in login response');
+                throw new Error('Authentication token not found in response');
             }
+            
+            // Set user data
+            if (loginData.user) {
+                this.currentUser = loginData.user;
+                
+                // Save user data to localStorage
+                localStorage.setItem(USER_DATA_KEY, JSON.stringify(this.currentUser));
+                
+                // Notify listeners about the authentication change
+                this.notifyAuthStateChange();
+                
+                return {
+                    user: this.currentUser,
+                    token: this.token || ''
+                };
+            } else {
+                console.error('No user data received in login response');
+                throw new Error('User data not found in response');
+            }
+        } catch (error) {
+            // Single error log, avoiding stack traces
+            console.error('Login error:', error instanceof Error ? error.message : 'Unknown error');
             throw error;
         }
     }
@@ -305,8 +361,8 @@ export class AuthService {
             this.currentUser = responseData.user;
             this.token = responseData.token;
             
-            localStorage.setItem('auth_token', responseData.token);
-            localStorage.setItem('user_data', JSON.stringify(responseData.user));
+            localStorage.setItem(AUTH_TOKEN_KEY, responseData.token);
+            localStorage.setItem(USER_DATA_KEY, JSON.stringify(responseData.user));
             
             this.notifyAuthStateChange();
             return { user: responseData.user, token: responseData.token };
@@ -339,7 +395,7 @@ export class AuthService {
                     ...(data.email ? { email: data.email } : {})
                 };
                 
-                localStorage.setItem('user_data', JSON.stringify(this.currentUser));
+                localStorage.setItem(USER_DATA_KEY, JSON.stringify(this.currentUser));
                 document.dispatchEvent(new CustomEvent('auth-state-changed', {
                     detail: { 
                         authenticated: true, 
@@ -378,7 +434,7 @@ export class AuthService {
             if (response && response.avatar_url) {
                 if (this.currentUser) {
                     this.currentUser.avatar_url = response.avatar_url;
-                    localStorage.setItem('user_data', JSON.stringify(this.currentUser));
+                    localStorage.setItem(USER_DATA_KEY, JSON.stringify(this.currentUser));
                 }
                 
                 // Try to get the latest user data to ensure everything is up to date
@@ -411,12 +467,10 @@ export class AuthService {
     public async logout(): Promise<void> {
         try {
             if (this.token) {
-                // Make API call to update online status on server
-                const apiUrl = window.location.hostname === 'localhost' ? 
-                    `http://${window.location.hostname}:4002/api/auth/logout` : 
-                    '/api/auth/logout';
+                // CORRECTED PATH: Now /protected/auth/logout
+                const logoutUrl = `${API_URL}/protected/auth/logout`;
                 
-                await fetch(apiUrl, {
+                await fetch(logoutUrl, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${this.token}`
@@ -432,7 +486,8 @@ export class AuthService {
     }
 
     public isAuthenticated(): boolean {
-        return !!this.token && !!this.currentUser;
+        const token = localStorage.getItem(AUTH_TOKEN_KEY);
+        return !!token;
     }
 
     public getCurrentUser(): User | null {
@@ -457,7 +512,6 @@ export class AuthService {
         document.body.appendChild(modalContainer);
 
         const cleanup = () => {
-            console.log('Cleaning up auth modal');
             modalContainer.remove();
             this.loginDialogVisible = false;
         };
@@ -468,27 +522,55 @@ export class AuthService {
 
         authModal.onLogin = async (username: string, password: string) => {
             try {
-                console.log('Attempting login with username:', username);
                 await this.login(username, password);
-                console.log('Login successful');
                 cleanup();
                 onSuccess();
             } catch (error) {
-                console.error('Login error:', error);
-                throw error;
+                // No need to log here since login() already logs errors
+                
+                // Ensure the error is displayed in the modal as well
+                if (error instanceof Error) {
+                    authModal.showError(error.message);
+                } else {
+                    authModal.showError('Login failed. Please try again.');
+                }
+                
+                // Find and reset the login button
+                const loginForm = modalContainer.querySelector('.login-form');
+                if (loginForm) {
+                    const submitButton = loginForm.querySelector('button[type="submit"]') as HTMLButtonElement;
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Login';
+                    }
+                }
             }
         };
 
         authModal.onRegister = async (username: string, password: string, email: string) => {
             try {
-                console.log('Attempting registration with username:', username, 'and email:', email);
                 await this.register(username, password, email);
-                console.log('Registration successful');
                 cleanup();
                 onSuccess();
             } catch (error) {
-                console.error('Registration error:', error);
-                throw error;
+                // No need to log here since register() already logs errors
+                
+                // Ensure the error is displayed in the modal as well
+                if (error instanceof Error) {
+                    authModal.showError(error.message);
+                } else {
+                    authModal.showError('Registration failed. Please try again.');
+                }
+                
+                // Find and reset the register button
+                const registerForm = modalContainer.querySelector('.register-form');
+                if (registerForm) {
+                    const submitButton = registerForm.querySelector('button[type="submit"]') as HTMLButtonElement;
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Register';
+                    }
+                }
             }
         };
 
@@ -516,7 +598,7 @@ export class AuthService {
         
         console.log('🔍 DEBUG: Updating user data:', data);
         
-        const response = await fetch(`${API_URL}/users/profile`, {
+        const response = await fetch(`${API_URL}/protected/users/profile`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -539,7 +621,7 @@ export class AuthService {
         this.currentUser = userData;
         
         // Store updated user data
-        localStorage.setItem('user_data', JSON.stringify(userData));
+        localStorage.setItem(USER_DATA_KEY, JSON.stringify(userData));
         
         // Notify of changes
         document.dispatchEvent(new CustomEvent('auth-state-changed', {
@@ -561,12 +643,12 @@ export class AuthService {
             console.log('🔍 DEBUG: Updating user data:', data);
             
             // Get auth token from localStorage
-            const token = localStorage.getItem('auth_token');
+            const token = localStorage.getItem(AUTH_TOKEN_KEY);
             if (!token) {
                 throw new Error('Authentication required');
             }
             
-            const response = await fetch(`${API_URL}/users/profile`, {
+            const response = await fetch(`${API_URL}/protected/users/profile`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -595,11 +677,11 @@ export class AuthService {
             }
             
             // Update localStorage with all the changes
-            const userData = localStorage.getItem('user_data');
+            const userData = localStorage.getItem(USER_DATA_KEY);
             if (userData) {
                 const parsedData = JSON.parse(userData);
                 Object.assign(parsedData, data);
-                localStorage.setItem('user_data', JSON.stringify(parsedData));
+                localStorage.setItem(USER_DATA_KEY, JSON.stringify(parsedData));
             }
             
             return { success: true, ...result };
@@ -612,14 +694,14 @@ export class AuthService {
     public static async updatePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean }> {
         try {
             // Get auth token from localStorage
-            const token = localStorage.getItem('auth_token');
+            const token = localStorage.getItem(AUTH_TOKEN_KEY);
             if (!token) {
                 throw new Error('Authentication required');
             }
             
-            console.log('🔍 DEBUG: Updating password via /users/profile endpoint');
+            console.log('🔍 DEBUG: Updating password via /protected/users/profile endpoint');
             
-            const response = await fetch(`${API_URL}/users/profile`, {
+            const response = await fetch(`${API_URL}/protected/users/profile`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -647,9 +729,9 @@ export class AuthService {
         }
     }
 
-    public updateCurrentUserFromLocalStorage(): void {
+    public updateCurrentUserFromlocalStorage(): void {
         try {
-            const userData = localStorage.getItem('user_data');
+            const userData = localStorage.getItem(USER_DATA_KEY);
             if (userData) {
                 const parsedData = JSON.parse(userData);
                 console.log('🔍 DEBUG: AuthService - Updating current user from localStorage:', parsedData);
@@ -675,5 +757,40 @@ export class AuthService {
         } catch (error) {
             console.error('🔍 DEBUG: AuthService - Error updating from localStorage:', error);
         }
+    }
+
+    private parseJwt(token: string): any {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(jsonPayload);
+        } catch (e) {
+            console.error("Error parsing JWT:", e);
+            return null;
+        }
+    }
+
+    private isTokenValid(): boolean {
+        const token = this.token;
+        if (!token) return false;
+        
+        try {
+            const decoded = this.parseJwt(token);
+            // Check if token is expired
+            if (!decoded.exp)
+                return true; // No expiration
+            return decoded.exp * 1000 > Date.now(); // exp is in seconds, Date.now() is ms
+        } catch (e) {
+            console.error("Error validating token:", e);
+            return false;
+        }
+    }
+
+
+    public getToken(): string | null {
+        return this.token;
     }
 } 

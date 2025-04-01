@@ -33,13 +33,13 @@ export class Navigation {
                     <div class="flex justify-between h-16">
                         <div class="flex items-center space-x-8">
                             <div class="flex-shrink-0 flex items-center">
-                                <a href="/" class="text-xl font-bold text-gray-800 cursor-pointer hover:text-blue-600 transition-colors px-3 py-2 rounded-md">Transcendence</a>
+                                <a href="/" class="text-xl font-bold text-gray-800 cursor-pointer hover:text-blue-600 transition-colors px-3 py-2 rounded-md">42_transcendence</a>
                             </div>
-                            <div class="hidden md:flex space-x-4">
-                                <a href="/game" class="text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer">Play</a>
-                                <a href="/leaderboard" class="text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer">Leaderboard</a>
+                            <div class="md:flex space-x-4">
                                 <a href="/friends" class="text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium user-only hidden transition-colors cursor-pointer">Friends</a>
+                                <a href="/tournaments" class="text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium user-only hidden transition-colors cursor-pointer">Tournaments</a>
                                 <a href="/profile" class="text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium user-only hidden transition-colors cursor-pointer">Profile</a>
+                                <a href="/stats" class="text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium user-only hidden transition-colors cursor-pointer">Stats</a>
                                 <a href="/settings" class="text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium user-only hidden transition-colors cursor-pointer">Settings</a>
                             </div>
                         </div>
@@ -105,101 +105,38 @@ export class Navigation {
     public updateAuthState(updatedFields: string[] = []): void {
         console.log('🔍 DEBUG: Navigation - updateAuthState called with fields:', updatedFields);
         
-        // Re-fetch user data from localStorage first to ensure we have the latest
-        const userData = localStorage.getItem('user_data');
-        if (userData) {
-            try {
-                const parsedData = JSON.parse(userData);
-                
-                // Check if we're specifically updating avatar fields
-                if (updatedFields.includes('avatar_url') && parsedData.avatar_url) {
-                    console.log('🔍 DEBUG: Navigation - Avatar update detected from localStorage:', parsedData.avatar_url);
-                }
-                
-                // Only update the AuthService user data if it exists and we have new data
-                const authService = this.authService;
-                if (authService) {
-                    const currentUser = authService.getCurrentUser();
-                    if (currentUser) {
-                        // Update specific fields that were changed
-                        if (updatedFields.includes('avatar_url') && parsedData.avatar_url) {
-                            currentUser.avatar_url = parsedData.avatar_url;
-                        }
-                        if (updatedFields.includes('username') && parsedData.username) {
-                            currentUser.username = parsedData.username;
-                        }
-                        if (updatedFields.includes('display_name')) {
-                            currentUser.display_name = parsedData.display_name;
-                        }
-                        if (updatedFields.includes('email') && parsedData.email) {
-                            currentUser.email = parsedData.email;
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('🔍 DEBUG: Navigation - Error parsing user data from localStorage:', error);
-            }
-        }
+        const authService = AuthService.getInstance();
+        const currentUser = authService.getCurrentUser();
         
-        // Check if the user is authenticated
-        const isAuthenticated = this.authService.isAuthenticated();
-        console.log('🔍 DEBUG: Navigation - isAuthenticated =', isAuthenticated);
-        
-        // Get current user info if authenticated
-        let currentUser = null;
-        if (isAuthenticated) {
-            currentUser = this.authService.getCurrentUser();
-            console.log('🔍 DEBUG: Navigation - currentUser:', currentUser);
-            
-            // If only specific fields were requested to be updated, only update those
-            if (updatedFields.length > 0) {
-                console.log('🔍 DEBUG: Navigation - Selectively updating fields:', updatedFields);
-                
-                if (updatedFields.includes('avatar_url')) {
-                    console.log('🔍 DEBUG: Navigation - Avatar update detected, current avatar:', currentUser?.avatar_url);
-                    this.updateUserAvatar(currentUser);
-                    return;
-                }
-                
-                if (updatedFields.includes('username') || 
-                    updatedFields.includes('display_name') || 
-                    updatedFields.includes('email')) {
-                    // These fields all require a full auth state update
-                    console.log('🔍 DEBUG: Navigation - Critical field updated, doing full update');
-                    // Continue with full update below
-                } else if (!updatedFields.includes('avatar_url')) {
-                    console.log('🔍 DEBUG: Navigation - No critical fields updated, skipping');
-                    return;
-                }
-            }
-        }
-        
-        console.log('Navigation: isAuthenticated =', isAuthenticated);
-        console.log('Navigation: currentUser =', currentUser);
-
-        // Update UI elements
-        const userOnlyElements = this.container.querySelectorAll('.user-only');
+        // Get references to DOM elements
+        const authButtons = this.container.querySelector('.login-button');
         const userInfo = this.container.querySelector('.user-info');
-        const loginButton = this.container.querySelector('.login-button');
         const usernameSpan = this.container.querySelector('.username');
         const userEmailSpan = this.container.querySelector('.user-email');
-
-        if (userOnlyElements) {
-            console.log('Navigation: updating userOnlyElements visibility');
+        const userAvatar = this.container.querySelector('.user-avatar') as HTMLImageElement;
+        
+        // Get all user-only elements
+        const userOnlyElements = this.container.querySelectorAll('.user-only');
+        
+        if (!currentUser) {
+            // Handle logged out state
+            if (authButtons) authButtons.classList.remove('hidden');
+            if (userInfo) userInfo.classList.add('hidden');
+            // Hide all user-only elements
             userOnlyElements.forEach(element => {
-                element.classList.toggle('hidden', !isAuthenticated);
+                element.classList.add('hidden');
             });
+            return;
         }
 
-        if (userInfo) {
-            console.log('Navigation: updating userInfo visibility');
-            userInfo.classList.toggle('hidden', !isAuthenticated);
-        }
-
-        if (loginButton) {
-            console.log('Navigation: updating loginButton visibility');
-            loginButton.classList.toggle('hidden', isAuthenticated);
-        }
+        // Handle logged in state
+        if (authButtons) authButtons.classList.add('hidden');
+        if (userInfo) userInfo.classList.remove('hidden');
+        
+        // Show all user-only elements
+        userOnlyElements.forEach(element => {
+            element.classList.remove('hidden');
+        });
 
         if (currentUser && usernameSpan && userEmailSpan) {
             console.log('Navigation: updating user display info');
@@ -220,8 +157,11 @@ export class Navigation {
             }
             console.log('Navigation: set display name to', userEmailSpan.textContent);
             
-            // Update avatar
-            this.updateUserAvatar(currentUser);
+            // Update avatar if it's in the updated fields or if we're doing a full update
+            if (updatedFields.includes('avatar_url') || updatedFields.length === 0) {
+                console.log('Navigation: updating avatar with URL:', currentUser.avatar_url);
+                this.updateUserAvatar(currentUser);
+            }
         }
     }
 

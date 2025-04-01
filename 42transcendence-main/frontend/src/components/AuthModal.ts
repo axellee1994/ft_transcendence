@@ -44,6 +44,10 @@ export class AuthModal {
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Enter your password">
                         </div>
+                        <!-- Login error message container below password field -->
+                        <div class="login-error-container hidden">
+                            <p class="text-xs text-red-500 font-medium"></p>
+                        </div>
                         <div class="flex justify-end space-x-3">
                             <button type="button" class="switch-to-register px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
                                 Register
@@ -289,29 +293,50 @@ export class AuthModal {
         }
     }
 
-    private showError(message: string): void {
-        console.log('Showing error message:', message);
-        const errorElement = this.container.querySelector('.error-message');
-        const errorText = this.container.querySelector('.error-text');
+    public showError(message: string): void {
+        // Reduce logging - just a single message
         
-        if (!errorElement || !errorText) {
-            console.error('Error elements not found in the DOM:', { 
-                errorElement: !!errorElement, 
-                errorText: !!errorText 
-            });
-            alert('Login Error: ' + message); // Fallback to alert if DOM elements aren't found
-            return;
+        // Determine which form is active
+        const isLoginFormActive = !this.container.querySelector('.login-form')?.classList.contains('hidden');
+        
+        if (isLoginFormActive) {
+            // Show error in the login form's error container
+            const loginErrorContainer = this.container.querySelector('.login-error-container');
+            const errorParagraph = loginErrorContainer?.querySelector('p');
+            
+            if (loginErrorContainer && errorParagraph) {
+                loginErrorContainer.classList.remove('hidden');
+                errorParagraph.textContent = message;
+            } else {
+                // Fallback to alert if error container not found
+                console.error('Login error container not found in the DOM');
+                alert('Login Error: ' + message);
+            }
+        } else {
+            // Use the old method for register form for now
+            const errorElement = this.container.querySelector('.error-message');
+            const errorText = this.container.querySelector('.error-text');
+            
+            if (!errorElement || !errorText) {
+                console.error('Error elements not found in the DOM');
+                alert('Registration Error: ' + message);
+                return;
+            }
+            
+            // Make sure error is visible
+            errorText.textContent = message;
+            errorElement.classList.remove('hidden');
         }
         
-        // Make sure error is visible
-        errorText.textContent = message;
-        errorElement.classList.remove('hidden');
-        console.log('Error message displayed:', message);
-        
-        // Automatically hide the error after 10 seconds (increased from 5)
+        // Automatically hide the error after 10 seconds
         setTimeout(() => {
-            console.log('Auto-hiding error message');
-            errorElement.classList.add('hidden');
+            if (isLoginFormActive) {
+                const loginErrorContainer = this.container.querySelector('.login-error-container');
+                loginErrorContainer?.classList.add('hidden');
+            } else {
+                const errorElement = this.container.querySelector('.error-message');
+                errorElement?.classList.add('hidden');
+            }
         }, 10000);
     }
 
@@ -321,9 +346,16 @@ export class AuthModal {
     }
 
     private clearError(): void {
+        // Clear the top banner error message
         const errorElement = this.container.querySelector('.error-message');
         if (errorElement) {
             errorElement.classList.add('hidden');
+        }
+        
+        // Clear the login form error message
+        const loginErrorContainer = this.container.querySelector('.login-error-container');
+        if (loginErrorContainer) {
+            loginErrorContainer.classList.add('hidden');
         }
     }
     

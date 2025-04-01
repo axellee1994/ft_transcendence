@@ -1,49 +1,22 @@
-#version: '3.8'
+# Removed version for compatibility
+
+x-compose-remove-orphans: true
 
 services:
-  # Frontend Service Configuration
-  frontend:
+  # Backend Service Configuration (now includes frontend build)
+  backend: # Renamed service to 'app' or keep 'backend' - let's keep 'backend' for consistency with Makefile
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "4000:4000"
-    environment:
-      - NODE_ENV=production
-    init: true
-    user: "root"
-
-  # Backend Service Configuration
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/Dockerfile
     ports:
       - "4002:4002"
     environment:
       - NODE_ENV=production
-    init: true
-    user: "root"
+    init: true # Kept for now, might be removable
+    user: "root" # Kept for now, might be removable
 
-  # Pong Standalone Service
-  pongstandalone:
-    build:
-      context: ./pongstandalone-tomerge
-      dockerfile: Dockerfile
-      no_cache: true
-    ports:
-      - "4001:4001"
-    restart: unless-stopped
-    environment:
-      - NODE_ENV=development
-    init: true
-    user: root
+# Removed frontend service
 
-networks:
-  app_network:
-    driver: bridge
+# Removed networks section as it's not explicitly used
 
-volumes:
-  backend_data:
-    driver: local
-
+# Removed volumes section as it's not explicitly used

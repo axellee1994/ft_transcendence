@@ -1,4 +1,4 @@
-import { API_URL } from '../services/auth';
+import { API_URL, AuthService } from '../services/auth';
 
 interface User {
     id: number;
@@ -237,20 +237,20 @@ export class FriendSearch {
         this.render();
 
         try {
-            const token = localStorage.getItem('auth_token');
+            const authService = AuthService.getInstance();
+            const token = authService.getToken();
             if (!token) {
                 this.error = 'You must be logged in to search for users';
                 return;
             }
 
             // Get current user data to filter out from results
-            const currentUserData = localStorage.getItem('user_data');
-            const currentUser = currentUserData ? JSON.parse(currentUserData) : null;
+            const currentUser = authService.getCurrentUser();
             
-            // Make sure we have the correct API URL prefix
+            // CORRECTED PATH: Use /api/protected/users/search
             const apiUrl = window.location.hostname === 'localhost' ? 
-                `http://${window.location.hostname}:4002/api/users/search?query=${encodeURIComponent(this.searchQuery)}` : 
-                `/api/users/search?query=${encodeURIComponent(this.searchQuery)}`;
+                `http://${window.location.hostname}:4002/api/protected/users/search?query=${encodeURIComponent(this.searchQuery)}` : 
+                `/api/protected/users/search?query=${encodeURIComponent(this.searchQuery)}`;
 
             const response = await fetch(apiUrl, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -295,12 +295,13 @@ export class FriendSearch {
     
     private async fetchFriendshipStatus(userId: number): Promise<void> {
         try {
-            const token = localStorage.getItem('auth_token');
+            const authService = AuthService.getInstance();
+            const token = authService.getToken();
             
-            // Make sure we have the correct API URL prefix
+            // CORRECTED PATH: Check friendship status via protected user route
             const apiUrl = window.location.hostname === 'localhost' ? 
-                `http://${window.location.hostname}:4002/api/users/${userId}/friendship` : 
-                `/api/users/${userId}/friendship`;
+                `http://${window.location.hostname}:4002/api/protected/users/${userId}/friendship` : 
+                `/api/protected/users/${userId}/friendship`;
             
             const response = await fetch(apiUrl, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -324,15 +325,16 @@ export class FriendSearch {
 
     private async sendFriendRequest(userId: number): Promise<void> {
         try {
-            const token = localStorage.getItem('auth_token');
+            const authService = AuthService.getInstance();
+            const token = authService.getToken();
             
-            // Make sure we have the correct API URL prefix
-            const apiUrl = window.location.hostname === 'localhost' ? 
-                `http://${window.location.hostname}:4002/api/friends/${userId}` : 
-                `/api/friends/${userId}`;
+            // CORRECTED PATH: Send request via protected friends route
+            const apiUrl = window.location.hostname === 'localhost' ?
+                `http://${window.location.hostname}:4002/api/protected/friends/${userId}` :
+                `/api/protected/friends/${userId}`;
             
             const response = await fetch(apiUrl, {
-                method: 'POST',
+                method: 'POST', // Correct method
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -353,9 +355,15 @@ export class FriendSearch {
 
     private async removeFriend(userId: number): Promise<void> {
         try {
-            const token = localStorage.getItem('auth_token');
-            const response = await fetch(`/api/friends/${userId}`, {
-                method: 'DELETE',
+            const authService = AuthService.getInstance();
+            const token = authService.getToken();
+            
+            // CORRECTED PATH: Remove/Cancel via protected friends route
+            const response = await fetch(window.location.hostname === 'localhost' ? 
+                                            `http://${window.location.hostname}:4002/api/protected/friends/${userId}` : 
+                                            `/api/protected/friends/${userId}`, 
+            {
+                method: 'DELETE', // Correct method
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -374,9 +382,15 @@ export class FriendSearch {
 
     private async acceptFriendRequest(userId: number): Promise<void> {
         try {
-            const token = localStorage.getItem('auth_token');
-            const response = await fetch(`/api/friends/${userId}/accept`, {
-                method: 'PUT',
+            const authService = AuthService.getInstance();
+            const token = authService.getToken();
+            
+            // CORRECTED PATH: Accept via protected friends route
+            const response = await fetch(window.location.hostname === 'localhost' ? 
+                                            `http://${window.location.hostname}:4002/api/protected/friends/${userId}/accept` : 
+                                            `/api/protected/friends/${userId}/accept`, 
+            {
+                method: 'PUT', // Correct method
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -395,9 +409,15 @@ export class FriendSearch {
 
     private async rejectFriendRequest(userId: number): Promise<void> {
         try {
-            const token = localStorage.getItem('auth_token');
-            const response = await fetch(`/api/friends/${userId}/reject`, {
-                method: 'PUT',
+            const authService = AuthService.getInstance();
+            const token = authService.getToken();
+            
+            // CORRECTED PATH: Reject via protected friends route
+            const response = await fetch(window.location.hostname === 'localhost' ? 
+                                            `http://${window.location.hostname}:4002/api/protected/friends/${userId}/reject` : 
+                                            `/api/protected/friends/${userId}/reject`, 
+            {
+                method: 'PUT', // Correct method
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 

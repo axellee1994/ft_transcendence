@@ -1,4 +1,4 @@
-import { API_URL } from '../services/auth';
+import { API_URL, AuthService } from '../services/auth';
 import { AvatarUpload } from './AvatarUpload';
 
 interface User {
@@ -41,7 +41,8 @@ export class UserProfile {
     }
 
     private async fetchUserProfile(): Promise<void> {
-        const token = localStorage.getItem('auth_token');
+        const authService = AuthService.getInstance();
+        const token = authService.getToken();
         if (!token) {
             throw new Error('Authentication required');
         }
@@ -229,7 +230,8 @@ export class UserProfile {
     }
 
     private async updateProfile(): Promise<void> {
-        const token = localStorage.getItem('auth_token');
+        const authService = AuthService.getInstance();
+        const token = authService.getToken();
         if (!token) {
             throw new Error('Authentication required');
         }
