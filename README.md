@@ -65,9 +65,8 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contact Information
 For questions or support, please contact:
-- Maintainer: axellee1994
-- GitHub: [https://github.com/axellee1994/ft_transcendence](https://github.com/axellee1994/ft_transcendence)
-- Email: <your-email@example.com>
+*   **Author(s):** axellee1994 - [https://github.com/axellee1994](https://github.com/axellee1994)
+*   **Project Link:** [https://github.com/axellee1994/ft_transcendence](https://github.com/axellee1994/ft_transcendence)
 
 ---
 
