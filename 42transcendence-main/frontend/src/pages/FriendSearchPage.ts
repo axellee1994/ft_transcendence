@@ -37,7 +37,6 @@ export function renderFriendSearchPage(container: HTMLElement): void {
         });
     }
     
-    // Add click handler for the back link
     const backLink = document.getElementById('back-to-friends-link');
     if (backLink) {
         backLink.addEventListener('click', (e) => {
@@ -49,4 +48,5 @@ export function renderFriendSearchPage(container: HTMLElement): void {
             }
         });
     }
-} 
+
+}

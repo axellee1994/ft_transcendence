@@ -3,15 +3,33 @@ export interface UserJWTPayload{
 }
 
 export interface Ireg {
-  user: {
-    id: number,
-    username: string,
-    email: string,
-    display_name: string,
-    is_online: boolean,
-    last_seen: string
+  user?: {
+    id?: number,
+    username?: string,
+    email?: string,
+    display_name?: string,
+    is_online?: boolean,
+    last_seen?: string,
+    is_2fa_enabled?: boolean,
+    avatar_url? : string,
+    is_remote_user?: boolean
   }
-  token: string
+  token?: string
+}
+
+export interface Ilogin{
+  user?: {
+    id?: number,
+    username?: string,
+    email?: string,
+    avatar_url?:string,
+    display_name?: string,
+    is_online?: boolean,
+    last_seen?: string,
+    is_2fa_enabled?: boolean,
+    is_remote_user?: boolean
+  }
+  token?: string
 }
 
 
@@ -35,6 +53,9 @@ export interface Ime{
   avatar_url: string
   wins: number
   losses: number
+  is_2fa_enabled: boolean
+  display_name : string
+  is_remote_user: boolean
 }
 
 export interface Iuser{
@@ -50,7 +71,8 @@ export interface Iuser{
   updated_at : string
   wins : number
   losses : number
-  twofa_secret : string
+  is_2fa_enabled: boolean
+  is_remote_user : boolean
 }
 
 export interface IuserCreated{
@@ -60,5 +82,32 @@ export interface IuserCreated{
   created_at: string,
   display_name:string,
   is_online : boolean,
+  last_seen : string,
+  is_2fa_enabled: boolean,
+  is_remote_user: boolean
+}
+
+export interface Itwofas{
+  id: number
+  code: number
+  user_id: number
+  expired_at: string
+  created_at : string
+}
+
+export interface IUserOnlineStatus{
+  id : number
+  username : string
+  is_online : string
   last_seen : string
+}
+
+export interface IUserSearchOnlineStatus extends IUserOnlineStatus{
+  display_name : string
+  avatar_url : string
+}
+
+export interface GoogleUserInfo {
+	email: string;
+	name: string;
 }

@@ -1,6 +1,4 @@
 import { AuthService, API_URL } from '../services/auth';
-import { FriendList } from '../components/FriendList';
-import { UserProfile } from '../components/UserProfile';
 import { formatRelativeTime } from '../utils/dateUtils';
 
 // Helper function to sanitize text to prevent XSS
@@ -14,12 +12,10 @@ function sanitizeText(text: string): string {
 function getFullAvatarUrl(avatarUrl: string | undefined): string {
     if (!avatarUrl) return '';
     
-    // If it's already a full URL, return it as is
     if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
         return avatarUrl;
     }
     
-    // If it's a backend path like /avatars/filename.jpg, prepend the API URL base
     if (avatarUrl.startsWith('/avatars/')) {
         const baseUrl = API_URL.substring(0, API_URL.indexOf('/api'));
         return `${baseUrl}${avatarUrl}`;
@@ -29,10 +25,9 @@ function getFullAvatarUrl(avatarUrl: string | undefined): string {
 }
 
 // Use the same default avatar SVG as in Navigation component
-const DEFAULT_AVATAR = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI1MCIgZmlsbD0iIzY0OTVFRCIvPjxwYXRoIGZpbGw9IiNmZmYiIGQ9Ik03MyA2OWMtMS44LTMuNC03LjktNS42LTExLjktNi43LTQtMS4yLTEuNS0yLjYtMi43LTIuNnMtMy4xLS4xLTguMy0uMS04LjQtLjYtOS42LS42LTMuMyAxLjctNC44IDMuM2MtMS41IDEuNi41IDEzLjIuNSAxMy4yczIuNS0uOSA1LjktLjlTNTMgNzQgNTMgNzRzMS0yLjIgMi45LTIuMiAzLjctLjIgMTAgMGM2LjQuMSAxLjEgNy41IDIuMiA3LjVzNC40LS4zIDUtLjNjMy45LTIuNCAwLTEwIDAtMTB6Ii8+PHBhdGggZmlsbD0iI2ZmZiIgZD0iTTUwIDYxLjhjMTEuMSAwIDIwLjEtOS4xIDIwLjEtMjAuMyAwLTExLjItOS05LTIwLjEtOS4xLTExLjEgMC0yMC4xLTIuMS0yMC4xIDkuMXM5IDIwLjMgMjAuMSAyMC4zeiIvPjwvc3ZnPg==`;
+export const DEFAULT_AVATAR = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI1MCIgZmlsbD0iIzY0OTVFRCIvPjxwYXRoIGZpbGw9IiNmZmYiIGQ9Ik03MyA2OWMtMS44LTMuNC03LjktNS42LTExLjktNi43LTQtMS4yLTEuNS0yLjYtMi43LTIuNnMtMy4xLS4xLTguMy0uMS04LjQtLjYtOS42LS42LTMuMyAxLjctNC44IDMuM2MtMS41IDEuNi41IDEzLjIuNSAxMy4yczIuNS0uOSA1LjktLjlTNTMgNzQgNTMgNzRzMS0yLjIgMi45LTIuMiAzLjctLjIgMTAgMGM2LjQuMSAxLjEgNy41IDIuMiA3LjVzNC40LS4zIDUtLjNjMy45LTIuNCAwLTEwIDAtMTB6Ii8+PHBhdGggZmlsbD0iI2ZmZiIgZD0iTTUwIDYxLjhjMTEuMSAwIDIwLjEtOS4xIDIwLjEtMjAuMyAwLTExLjItOS05LTIwLjEtOS4xLTExLjEgMC0yMC4xLTIuMS0yMC4xIDkuMXM5IDIwLjMgMjAuMSAyMC4zeiIvPjwvc3ZnPg==`;
 
 export function renderProfilePage(container: HTMLElement, userId?: number): void {
-    // Input validation
     if (userId !== undefined && (!Number.isInteger(userId) || userId < 1)) {
         container.innerHTML = `
             <div class="p-8 text-center">
@@ -64,7 +59,6 @@ function renderCurrentUserProfile(container: HTMLElement): void {
         return;
     }
 
-    // First render a loading state
     container.innerHTML = `
         <div class="py-8">
             <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -76,7 +70,6 @@ function renderCurrentUserProfile(container: HTMLElement): void {
         </div>
     `;
 
-    // Then fetch the detailed stats
     fetchDetailedStats(container, currentUser);
 }
 
@@ -88,7 +81,6 @@ async function fetchDetailedStats(container: HTMLElement, currentUser: any): Pro
             throw new Error('Authentication required');
         }
         
-        // Fetch detailed stats using the correct protected path
         const userStatsResponse = await fetch(`${API_URL}/protected/user-stats/me`, {
             headers: { 
                 'Authorization': `Bearer ${token}`,
@@ -96,14 +88,12 @@ async function fetchDetailedStats(container: HTMLElement, currentUser: any): Pro
             }
         });
         
-        // Default stats in case API fails
         let detailedStats = { 
             games_played: 0, 
             games_won: 0, 
             win_rate: 0
         };
         
-        // If we got detailed stats, use them
         if (userStatsResponse.ok) {
             const fetchedStats = await userStatsResponse.json();
             detailedStats = {
@@ -112,7 +102,6 @@ async function fetchDetailedStats(container: HTMLElement, currentUser: any): Pro
             };
         }
         
-        // Fetch recent matches using the correct protected path
         const matchHistoryResponse = await fetch(`${API_URL}/protected/match-history`, {
             headers: { 
                 'Authorization': `Bearer ${token}`,
@@ -126,7 +115,6 @@ async function fetchDetailedStats(container: HTMLElement, currentUser: any): Pro
             console.log("Recent matches:", recentMatches);
         }
         
-        // Render the complete profile with stats
         container.innerHTML = `
             <div class="py-8">
                 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -169,12 +157,13 @@ async function fetchDetailedStats(container: HTMLElement, currentUser: any): Pro
                                 <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Matches</h3>
                                 <div class="space-y-3">
                                     ${recentMatches.length > 0 
-                                        ? recentMatches.slice(0, 5).map(match => `
-                                            <div class="bg-gray-50 p-4 rounded-lg">
+                                        ? recentMatches.map(match => `
+                                            <div class="bg-gray-50 p-4 rounded-lg mb-3">
+                                                <h4 class="text-md font-semibold text-gray-800 mb-1">${match.game_title || 'Pong Game'}</h4>
                                                 <div class="flex justify-between items-center">
-                                                    <div class="flex items-center">
-                                                        <span class="font-medium ${match.game_type === 'single' ? 'text-blue-600' : 'text-purple-600'} mr-2">
-                                                            ${match.game_type === 'single' ? 'Single Player' : 'Multiplayer'}
+                                                    <div class="flex items-center text-sm">
+                                                        <span class="font-medium ${match.game_type === 'single' ? 'text-blue-600' : match.game_type === 'tournament' ? 'text-green-600' : 'text-purple-600'} mr-2">
+                                                            ${match.game_type === 'single' ? 'Single Player' : match.game_type === 'tournament' ? 'Tournament' : 'Multiplayer'}
                                                         </span>
                                                         <span class="text-gray-600">
                                                             ${match.game_type === 'single' ? 'vs AI' : `vs ${match.opponent_display_name || match.opponent_username || 'Opponent'}`}
@@ -207,8 +196,9 @@ async function fetchDetailedStats(container: HTMLElement, currentUser: any): Pro
         `;
     } catch (error) {
         console.error('Error fetching detailed stats:', error);
+
+
         
-        // Render a basic profile if stats fetching fails
         container.innerHTML = `
             <div class="py-8">
                 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -266,30 +256,25 @@ async function fetchDetailedStats(container: HTMLElement, currentUser: any): Pro
 // Helper function to format dates in a readable way
 function formatDate(dateString: string): string {
     const date = new Date(dateString);
-    // Add 8 hours to the timestamp
     date.setHours(date.getHours() + 8);
     const now = new Date();
     
-    // If today, show time
     if (date.toDateString() === now.toDateString()) {
         return `Today at ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
     }
     
-    // If yesterday, show "Yesterday"
     const yesterday = new Date(now);
     yesterday.setDate(now.getDate() - 1);
     if (date.toDateString() === yesterday.toDateString()) {
         return `Yesterday at ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
     }
     
-    // If within the last 7 days, show day name
     const oneWeekAgo = new Date(now);
     oneWeekAgo.setDate(now.getDate() - 7);
     if (date > oneWeekAgo) {
         return `${date.toLocaleDateString(undefined, { weekday: 'long' })} at ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
     }
     
-    // Otherwise show full date
     return date.toLocaleDateString(undefined, { 
         year: 'numeric', 
         month: 'short', 
@@ -309,7 +294,6 @@ async function fetchUserProfile(container: HTMLElement, userId: number): Promise
             throw new Error('Authentication required');
         }
         
-        // CORRECTED PATH: Add /protected/
         const response = await fetch(`${API_URL}/protected/users/${userId}`, {
             headers: { 
                 'Authorization': `Bearer ${token}`,
@@ -323,12 +307,10 @@ async function fetchUserProfile(container: HTMLElement, userId: number): Promise
         
         const user = await response.json();
         
-        // Validate user object
         if (!user || typeof user !== 'object' || !user.username) {
             throw new Error('Invalid user data received');
         }
         
-        // CORRECTED PATH: Add /protected/
         const statsResponse = await fetch(`${API_URL}/protected/users/${userId}/stats`, {
             headers: { 
                 'Authorization': `Bearer ${token}`,
@@ -336,10 +318,8 @@ async function fetchUserProfile(container: HTMLElement, userId: number): Promise
             }
         });
         
-        // Get basic stats
         const basicStats = statsResponse.ok ? await statsResponse.json() : { wins: 0, losses: 0, winRate: 0, totalGames: 0 };
         
-        // CORRECTED PATH: Add /protected/
         const matchHistoryResponse = await fetch(`${API_URL}/protected/match-history?user_id=${userId}`, {
             headers: { 
                 'Authorization': `Bearer ${token}`,
@@ -353,7 +333,6 @@ async function fetchUserProfile(container: HTMLElement, userId: number): Promise
             console.log("User recent matches:", recentMatches);
         }
         
-        // Render user profile with received data
         container.innerHTML = `
             <div class="py-8">
                 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -400,11 +379,12 @@ async function fetchUserProfile(container: HTMLElement, userId: number): Promise
                                 <div class="space-y-3">
                                     ${recentMatches.length > 0 
                                         ? recentMatches.slice(0, 5).map(match => `
-                                            <div class="bg-gray-50 p-4 rounded-lg">
+                                            <div class="bg-gray-50 p-4 rounded-lg mb-3">
+                                                <h4 class="text-md font-semibold text-gray-800 mb-1">${match.game_title || 'Pong Game'}</h4>
                                                 <div class="flex justify-between items-center">
-                                                    <div class="flex items-center">
-                                                        <span class="font-medium ${match.game_type === 'single' ? 'text-blue-600' : 'text-purple-600'} mr-2">
-                                                            ${match.game_type === 'single' ? 'Single Player' : 'Multiplayer'}
+                                                    <div class="flex items-center text-sm">
+                                                        <span class="font-medium ${match.game_type === 'single' ? 'text-blue-600' : match.game_type === 'tournament' ? 'text-green-600' : 'text-purple-600'} mr-2">
+                                                            ${match.game_type === 'single' ? 'Single Player' : match.game_type === 'tournament' ? 'Tournament' : 'Multiplayer'}
                                                         </span>
                                                         <span class="text-gray-600">
                                                             ${match.game_type === 'single' ? 'vs AI' : `vs ${match.opponent_display_name || match.opponent_username || 'Opponent'}`}
@@ -442,7 +422,6 @@ async function fetchUserProfile(container: HTMLElement, userId: number): Promise
             </div>
         `;
         
-        // Add event listeners for the back buttons
         document.getElementById('back-to-friends-btn')?.addEventListener('click', () => {
             if ((window as any).navigate) {
                 (window as any).navigate('/friends');
@@ -461,7 +440,6 @@ async function fetchUserProfile(container: HTMLElement, userId: number): Promise
             </div>
         `;
         
-        // Add event listeners for the back buttons
         document.getElementById('error-back-btn')?.addEventListener('click', () => {
             if ((window as any).navigate) {
                 (window as any).navigate('/friends');

@@ -1,11 +1,11 @@
 import { AuthService } from '../services/auth';
 import { AvatarUpload } from '../components/AvatarUpload';
+import { isValidEmail,isValidFieldLen } from '../utils/validation';
 
 // Export a render function instead of a class, to match other components
 export function renderSettingsPage(container: HTMLElement): void {
     const initialize = async () => {
         try {
-            // Get current user data from AuthService
             const authService = AuthService.getInstance();
             const currentUser = authService.getCurrentUser();
             
@@ -18,7 +18,9 @@ export function renderSettingsPage(container: HTMLElement): void {
                 username: currentUser.username || '',
                 display_name: currentUser.display_name || '',
                 email: currentUser.email || '',
-                avatar_url: currentUser.avatar_url || ''
+                avatar_url: currentUser.avatar_url || '',
+                is_2fa_enabled: currentUser.is_2fa_enabled || false,
+                is_remote_user: currentUser.is_remote_user || false
             };
             
             await renderSettingsUI(originalValues);
@@ -42,12 +44,18 @@ export function renderSettingsPage(container: HTMLElement): void {
                         <button id="profile-tab" class="px-6 py-3 border-b-2 border-blue-500 font-medium text-sm text-blue-600">
                             Profile
                         </button>
+
+                        ${originalValues.is_remote_user === false ? `
                         <button id="account-tab" class="px-6 py-3 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
                             Account
                         </button>
                         <button id="password-tab" class="px-6 py-3 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
                             Password
                         </button>
+                        <button id="twofa-tab" class="px-6 py-3 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                            2FA
+                        </button>` : ''}
+                        
                     </div>
                         
                     <!-- Tab Content -->
@@ -78,8 +86,10 @@ export function renderSettingsPage(container: HTMLElement): void {
                                                     name="display_name" 
                                                     value="${originalValues.display_name || ''}"
                                                     placeholder="How you want to be known"
+                                                    maxlength="20"
                                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                                 />
+                                                <p class="text-xs text-gray-500 mt-1">Max 20 characters</p>
                                                 <p class="mt-1 text-sm text-gray-500">
                                                     This is the name that will be displayed to other users
                                                 </p>
@@ -90,7 +100,7 @@ export function renderSettingsPage(container: HTMLElement): void {
                                                     type="submit"
                                                     id="save-profile-btn"
                                                     class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                                                    disabled
+                                                    
                                                 >
                                                     Save Profile
                                                 </button>
@@ -125,8 +135,12 @@ export function renderSettingsPage(container: HTMLElement): void {
                                                     id="username" 
                                                     name="username" 
                                                     value="${originalValues.username}"
+                                                    minlength="3"
+                                                    maxlength="20"
+                                                    required
                                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                                 />
+                                                <p class="text-xs text-gray-500 mt-1">Min 3, Max 20 characters</p>
                                                 <p class="mt-1 text-sm text-gray-500">
                                                     This is your unique identifier on the platform
                                                 </p>
@@ -139,8 +153,11 @@ export function renderSettingsPage(container: HTMLElement): void {
                                                     id="email" 
                                                     name="email" 
                                                     value="${originalValues.email}"
+                                                    maxlength="50"
+                                                    required
                                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                                 />
+                                                <p class="text-xs text-gray-500 mt-1">Max 50 characters</p>
                                                 <p class="mt-1 text-sm text-gray-500">
                                                     We'll never share your email with anyone else
                                                 </p>
@@ -177,6 +194,9 @@ export function renderSettingsPage(container: HTMLElement): void {
                                                     id="current_password" 
                                                     name="current_password" 
                                                     placeholder="••••••••"
+                                                    minlength="6"
+                                                    maxlength="12"
+                                                    required
                                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                                 />
                                             </div>
@@ -188,6 +208,9 @@ export function renderSettingsPage(container: HTMLElement): void {
                                                     id="new_password" 
                                                     name="new_password" 
                                                     placeholder="••••••••"
+                                                    minlength="6"
+                                                    maxlength="12"
+                                                    required
                                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                                 />
                                             </div>
@@ -199,6 +222,9 @@ export function renderSettingsPage(container: HTMLElement): void {
                                                     id="confirm_password" 
                                                     name="confirm_password" 
                                                     placeholder="••••••••"
+                                                    minlength="6"
+                                                    maxlength="12"
+                                                    required
                                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                                 />
                                             </div>
@@ -216,6 +242,47 @@ export function renderSettingsPage(container: HTMLElement): void {
                                 </div>
                             </div>
                         </div>
+                         <!-- twofa Tab -->
+                        <div id="twofa-content" class="tab-content hidden">
+                            <div class="space-y-6">
+                                <div class="flex flex-col md:flex-row gap-6 items-start">
+                                    <div class="w-full md:w-1/3">
+                                        <h2 class="text-lg font-medium">Enable 2FA</h2>
+                                        <p class="text-sm text-gray-500 mt-1">Ensure your account is secure with 2FA</p>
+                                    </div>
+                                    <div class="w-full md:w-2/3">
+                                        <form id="twofa-form" class="space-y-4">
+
+                                            <div class="form-group mt-4">
+                                              
+                                                <input
+                                                ${originalValues.is_2fa_enabled == true ? 'checked' : ''}
+                                                id="twofa_check"
+                                                name="twofa_check"
+                                                type="checkbox" 
+                                                value="enabled"
+                                                class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded-sm focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                                />
+                                                <label for="twofa_check" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">Enable Email 2FA</label>
+                                               
+                                            </div>
+                                    
+                                            <div class="mt-6">
+                                                <button 
+                                                    type="submit"
+                                                    class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                                                >
+                                                    Update
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+
+
                     </div>
                 </div>
 
@@ -223,7 +290,6 @@ export function renderSettingsPage(container: HTMLElement): void {
             </div>
         `;
 
-        // Initialize avatar upload
         const avatarContainer = document.getElementById('avatar-container');
         if (avatarContainer instanceof HTMLElement) {
             const avatarUpload = new AvatarUpload({
@@ -231,83 +297,46 @@ export function renderSettingsPage(container: HTMLElement): void {
                 currentAvatar: originalValues.avatar_url,
                 onPendingChange: (hasPendingChanges) => {
                     console.log('🔍 DEBUG: Avatar pending changes:', hasPendingChanges);
-                    updateProfileFormState(hasPendingChanges);
                 }
             });
-            // Store the instance on the container for later access
             (avatarContainer as any)._avatarUpload = avatarUpload;
         } else {
             console.error('Avatar container not found');
         }
     };
 
-    // Helper functions
     const setupEventListeners = (originalValues: any) => {
-        // Set up form submissions
         const profileForm = document.getElementById('profile-form') as HTMLFormElement;
         const accountForm = document.getElementById('account-form') as HTMLFormElement;
         const passwordForm = document.getElementById('password-form') as HTMLFormElement;
+        const twofaForm = document.getElementById('twofa-form') as HTMLFormElement;
+        
         const cancelProfileBtn = document.getElementById('cancel-profile-btn');
 
-        // Set up event listeners for forms
         profileForm?.addEventListener('submit', handleProfileFormSubmit);
         accountForm?.addEventListener('submit', handleAccountFormSubmit);
         passwordForm?.addEventListener('submit', handlePasswordFormSubmit);
+        twofaForm?.addEventListener('submit', handleTwofaFormSubmit);
         
-        // Set up event listener for cancel button
-        cancelProfileBtn?.addEventListener('click', handleProfileCancel);
-        
-        // Set up event listener for display name changes
         const displayNameInput = document.getElementById('display_name') as HTMLInputElement;
         if (displayNameInput) {
             displayNameInput.addEventListener('input', () => {
                 const hasNameChanges = displayNameInput.value !== (originalValues?.display_name || '');
-                // Cannot access AvatarUpload instance directly in this structure, 
-                // will handle changes through the onPendingChange callback
-                updateProfileFormState(hasNameChanges);
             });
         }
-    };
-
-    let hasProfileChanges = false;
-
-    const updateProfileFormState = (hasChanges: boolean): void => {
-        hasProfileChanges = hasChanges;
-        
-        const saveButton = document.getElementById('save-profile-btn') as HTMLButtonElement;
-        const cancelButton = document.getElementById('cancel-profile-btn');
-        
-        if (saveButton) {
-            saveButton.disabled = !hasChanges;
-        }
-        
-        if (cancelButton) {
-            cancelButton.classList.toggle('hidden', !hasChanges);
-        }
-    };
-
-    const handleProfileCancel = (): void => {
-        // Reset display name input
-        const displayNameInput = document.getElementById('display_name') as HTMLInputElement;
-        if (displayNameInput) {
-            displayNameInput.value = '';
-        }
-        
-        // Update form state
-        updateProfileFormState(false);
     };
 
     const setupTabSwitching = (): void => {
         const tabs = [
             { id: 'profile-tab', content: 'profile-content' },
             { id: 'account-tab', content: 'account-content' },
-            { id: 'password-tab', content: 'password-content' }
+            { id: 'password-tab', content: 'password-content' },
+            { id: 'twofa-tab', content: 'twofa-content' }
         ];
 
         tabs.forEach(tab => {
             const tabButton = document.getElementById(tab.id);
             tabButton?.addEventListener('click', () => {
-                // Hide all content
                 tabs.forEach(t => {
                     const content = document.getElementById(t.content);
                     const button = document.getElementById(t.id);
@@ -320,13 +349,11 @@ export function renderSettingsPage(container: HTMLElement): void {
                     }
                 });
 
-                // Show selected content
                 const selectedContent = document.getElementById(tab.content);
                 if (selectedContent) {
                     selectedContent.classList.remove('hidden');
                 }
 
-                // Update tab appearance
                 if (tabButton) {
                     tabButton.classList.remove('border-transparent', 'text-gray-500');
                     tabButton.classList.add('border-blue-500', 'text-blue-600');
@@ -348,71 +375,65 @@ export function renderSettingsPage(container: HTMLElement): void {
 
         try {
             const formData = new FormData(form);
-            const displayName = formData.get('display_name') as string;
-            let avatarBase64: string | null = null; // Variable to hold base64 data
+            let displayName = formData.get('display_name') as string;
+            let avatarBase64: string | null = null;
 
-            // Get the AvatarUpload instance
+            displayName = displayName.trim();
+
+            if (!isValidFieldLen(displayName, 0, 20))
+            {
+                showError('Invalid display name, max 20 characters');
+                return;
+            }
+
             const avatarContainer = document.getElementById('avatar-container');
             let avatarUploadInstance;
             if (avatarContainer) {
                 avatarUploadInstance = (avatarContainer as any)._avatarUpload;
             }
 
-            // If avatar has pending changes, get the base64 data
             if (avatarUploadInstance && avatarUploadInstance.hasPendingChanges()) {
                 console.log('🔍 DEBUG: SettingsPage - Getting pending avatar base64 data');
                 avatarBase64 = await avatarUploadInstance.getPendingAvatarBase64();
                 if (!avatarBase64) {
-                    // Handle error if conversion failed (though unlikely if hasPendingChanges was true)
                     throw new Error('Failed to convert avatar to base64');
                 }
-                 // Clear the pending state in AvatarUpload after getting the data
-                 // Note: saveChanges() now primarily clears state.
                  await avatarUploadInstance.saveChanges(); 
             }
 
-            // Prepare the combined payload for the API call
             const updatePayload: { display_name?: string; avatar_base64?: string } = {};
-            // Only include fields if they have actually changed or are present
-            // Check originalValues to see if display_name changed
             const authService = AuthService.getInstance();
-            const originalValues = authService.getCurrentUser(); // Assuming this holds original values
-            if (originalValues && displayName !== originalValues.display_name) {
+            const originalValues = authService.getCurrentUser();
+            if (originalValues && displayName !== originalValues.display_name)
                  updatePayload.display_name = displayName;
-            }
-            if (avatarBase64) {
+            if (avatarBase64)
                  updatePayload.avatar_base64 = avatarBase64;
+
+            if (Object.keys(updatePayload).length > 0)
+            {
+                console.log('🔍 DEBUG: SettingsPage - Calling AuthService.updateUserData with payload:', updatePayload);
+                const response = await AuthService.updateUserData(updatePayload);
+    
+                if (response.success)
+                {
+                    showSuccess('Profile information updated successfully');
+
+                    const updatedUser = authService.getCurrentUser();
+                    if (avatarUploadInstance && updatedUser)
+                    {
+                        console.log('🔍 DEBUG: SettingsPage - Calling avatarUploadInstance.updateCurrentAvatar with URL:', updatedUser.avatar_url);
+                        avatarUploadInstance.updateCurrentAvatar(updatedUser.avatar_url);
+                    }
+                }
+                else
+                     throw new Error('Failed to update user data'); 
+            }
+            else
+            {
+                console.log('🔍 DEBUG: SettingsPage - No changes detected to save.');
+                 showSuccess('No changes to save.');
             }
 
-            // Only call API if there's something to update
-            if (Object.keys(updatePayload).length > 0) {
-                 console.log('🔍 DEBUG: SettingsPage - Calling AuthService.updateUserData with payload:', updatePayload);
-                 // Update profile data (including avatar if present)
-                 const response = await AuthService.updateUserData(updatePayload);
-    
-                 if (response.success) {
-                    // Trigger auth state change with updated fields
-                    const updatedFields = Object.keys(updatePayload).map(key => 
-                        key === 'avatar_base64' ? 'avatar_url' : key
-                    );
-                    document.dispatchEvent(new CustomEvent('auth-state-changed', {
-                        detail: { 
-                            authenticated: true,
-                            updatedFields: updatedFields
-                        }
-                    }));
-                    showSuccess('Profile information updated successfully');
-                 } else {
-                     // Throw generic error if AuthService indicates failure
-                     // The specific error might be logged within AuthService or the backend
-                     throw new Error('Failed to update user data'); 
-                 }
-            } else {
-                console.log('🔍 DEBUG: SettingsPage - No changes detected to save.');
-                 showSuccess('No changes to save.'); // Or just do nothing
-            }
-            
-            updateProfileFormState(false); // Reset form state regardless of API call
         } catch (error) {
             console.error('Failed to update profile:', error);
             showError(error instanceof Error ? error.message : 'Failed to update profile');
@@ -429,9 +450,30 @@ export function renderSettingsPage(container: HTMLElement): void {
         
         const form = event.target as HTMLFormElement;
         const formData = new FormData(form);
-        const username = formData.get('username') as string;
-        const email = formData.get('email') as string;
-        
+        let username = formData.get('username') as string;
+        let email = formData.get('email') as string;
+
+        username = username.trim();
+        email = email.trim();
+
+        if (!isValidFieldLen(username, 3, 20))
+        {
+            showError('Invalid username, min 3, max 20 characters');
+            return;
+        }
+
+        if (!isValidFieldLen(email, 1, 50))
+        {
+            showError('Invalid email, max 50 characters');
+            return;
+        }
+
+        if (!isValidEmail(email))
+        {
+            showError('Invalid email');
+            return;
+        }
+
         try {
             const response = await AuthService.updateUserData({
                 username: username,
@@ -439,9 +481,7 @@ export function renderSettingsPage(container: HTMLElement): void {
             });
 
             if (response.success) {
-                // AuthService handles user data persistence
 
-                // Trigger auth state change 
                 document.dispatchEvent(new CustomEvent('auth-state-changed', {
                     detail: { 
                         authenticated: true,
@@ -466,19 +506,27 @@ export function renderSettingsPage(container: HTMLElement): void {
         const currentPassword = formData.get('current_password') as string;
         const newPassword = formData.get('new_password') as string;
         const confirmPassword = formData.get('confirm_password') as string;
-        
-        // Perform validation
-        if (!currentPassword) {
+
+        if (!currentPassword)
+        {
             showError('Current password is required');
             return;
         }
-        
-        if (!newPassword) {
-            showError('New password is required');
+
+        if (!isValidFieldLen(newPassword, 6, 12))
+        {
+            showError('Invalid new password, min 6, max 12 characters');
+            return;
+        }
+
+        if (!isValidFieldLen(confirmPassword, 6, 12))
+        {
+            showError('Invalid confirm password, min 6, max 12 characters');
             return;
         }
         
-        if (newPassword !== confirmPassword) {
+        if (newPassword !== confirmPassword)
+        {
             showError('New passwords do not match');
             return;
         }
@@ -487,7 +535,6 @@ export function renderSettingsPage(container: HTMLElement): void {
             const response = await AuthService.updatePassword(currentPassword, newPassword);
 
             if (response.success) {
-                // Clear password fields
                 (form.querySelector('#current_password') as HTMLInputElement).value = '';
                 (form.querySelector('#new_password') as HTMLInputElement).value = '';
                 (form.querySelector('#confirm_password') as HTMLInputElement).value = '';
@@ -499,6 +546,33 @@ export function renderSettingsPage(container: HTMLElement): void {
             showError(error instanceof Error ? error.message : 'Failed to update password');
         }
     };
+
+    const handleTwofaFormSubmit = async (event: Event): Promise<void> => {
+        event.preventDefault();
+        
+        const form = event.target as HTMLFormElement;
+        const formData = new FormData(form);
+        
+        const twofa_check = formData.get('twofa_check') as string;
+        const twofa = (twofa_check === 'enabled') ? true : false as boolean;
+
+        try {
+            const response = await AuthService.updateUserData({
+                is_2fa_enabled: twofa
+            });
+
+            if (response.success) 
+            {
+                const userData = JSON.parse(localStorage.getItem('user_data'));
+                userData.is_2fa_enabled = twofa;
+                localStorage.setItem('user_data', JSON.stringify(userData));
+                showSuccess('Account information updated successfully');
+            }
+            } catch (error) {
+                console.error('Failed to update 2FA option:', error);
+                showError(error instanceof Error ? error.message : 'Failed to update 2FA option');
+        }
+    }
 
     const showError = (message: string): void => {
         const statusDiv = document.getElementById('status-message');
@@ -516,13 +590,11 @@ export function renderSettingsPage(container: HTMLElement): void {
             statusDiv.classList.remove('hidden', 'bg-red-100', 'text-red-800');
             statusDiv.classList.add('bg-green-100', 'text-green-800');
             
-            // Hide after 5 seconds
             setTimeout(() => {
                 statusDiv.classList.add('hidden');
             }, 5000);
         }
     };
 
-    // Initialize the page
     initialize();
 } 

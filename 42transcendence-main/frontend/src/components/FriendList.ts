@@ -25,7 +25,6 @@ export class FriendList {
     private filteredFriends: Friend[] = [];
     private filterQuery: string = '';
     
-    // Static instance for global access
     private static instance: FriendList | null = null;
 
     constructor(private props: FriendListProps) {
@@ -55,10 +54,7 @@ export class FriendList {
         const token = AuthService.getInstance().getToken();
         if (!token) return;
         
-        // CORRECTED PATH: /api/protected/friends/
-        const apiUrl = window.location.hostname === 'localhost' ? 
-            `http://${window.location.hostname}:4002/api/protected/friends` :
-            '/api/protected/friends';
+        const apiUrl = "/api/protected/friends";
         
         try {
             console.log("Fetching friends from:", apiUrl);
@@ -78,10 +74,8 @@ export class FriendList {
                 throw new Error(`Failed to load friends (${response.status})`);
             }
 
-            // Get response as text first to debug potential issues
             const responseText = await response.text();
             
-            // Only try to parse if we have a non-empty response
             if (responseText && responseText.trim()) {
                 try {
                     this.friends = JSON.parse(responseText);
@@ -91,7 +85,6 @@ export class FriendList {
                     throw new Error('Invalid response from server');
                 }
             } else {
-                // Empty response is treated as empty array
                 this.friends = [];
                 console.log("No friends found (empty response)");
             }
@@ -105,11 +98,8 @@ export class FriendList {
         const token = AuthService.getInstance().getToken();
         if (!token) return;
         
-        // CORRECTED PATH: /api/protected/friends/pending
-        const apiUrl = window.location.hostname === 'localhost' ? 
-            `http://${window.location.hostname}:4002/api/protected/friends/pending` :
-            '/api/protected/friends/pending';
-        
+        const apiUrl = '/api/protected/friends/pending';
+
         try {
             console.log("Fetching pending requests from:", apiUrl);
                         
@@ -119,16 +109,13 @@ export class FriendList {
 
             if (!response.ok) {
                 if (response.status === 401) {
-                    // Don't show error for unauthorized on pending requests
                     return;
                 }
                 throw new Error(`Failed to load pending requests (${response.status})`);
             }
 
-            // Get response as text first to debug potential issues
             const responseText = await response.text();
             
-            // Only try to parse if we have a non-empty response
             if (responseText && responseText.trim()) {
                 try {
                     this.pendingRequests = JSON.parse(responseText);
@@ -137,26 +124,21 @@ export class FriendList {
                     this.pendingRequests = [];
                 }
             } else {
-                // Empty response is treated as empty array
                 this.pendingRequests = [];
             }
         } catch (err) {
             console.error("Failed to load pending requests:", err);
-            // Don't set error for pending requests, just log it
         } finally {
             this.loading = false;
         }
     }
 
     public render(): void {
-        // Clear previous content
         this.props.container.innerHTML = '';
 
-        // Create main container
         const container = document.createElement('div');
         container.className = 'friends-container w-full';
 
-        // Handle loading state
         if (this.loading) {
             const loadingElement = document.createElement('div');
             loadingElement.className = 'loading-indicator flex justify-center items-center p-8';
@@ -170,7 +152,6 @@ export class FriendList {
             return;
         }
 
-        // Handle error state
         if (this.error) {
             const errorElement = document.createElement('div');
             errorElement.className = 'error-message p-4 bg-red-100 text-red-600 rounded-md';
@@ -181,15 +162,12 @@ export class FriendList {
             return;
         }
 
-        // Create tabs container
         const tabsContainer = document.createElement('div');
         tabsContainer.className = 'tabs-container border-b mb-4';
 
-        // Create tabs
         const tabsList = document.createElement('div');
         tabsList.className = 'flex';
 
-        // Friends tab
         const friendsTab = document.createElement('button');
         friendsTab.className = `tab py-2 px-4 font-medium ${this.activeTab === 'friends' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`;
         friendsTab.dataset.tab = 'friends';
@@ -198,7 +176,6 @@ export class FriendList {
         friendsTabText.textContent = `Friends (${this.friends.length})`;
         friendsTab.appendChild(friendsTabText);
 
-        // Pending Requests tab
         const pendingTab = document.createElement('button');
         pendingTab.className = `tab py-2 px-4 font-medium ${this.activeTab === 'pending' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`;
         pendingTab.dataset.tab = 'pending';
@@ -207,38 +184,14 @@ export class FriendList {
         pendingTabText.textContent = `Pending Requests (${this.pendingRequests.length})`;
         pendingTab.appendChild(pendingTabText);
 
-        // Add tabs to container
         tabsList.appendChild(friendsTab);
         tabsList.appendChild(pendingTab);
         tabsContainer.appendChild(tabsList);
         container.appendChild(tabsContainer);
 
-        // Create search filter - only show in friends tab
-        if (this.activeTab === 'friends') {
-            const filterContainer = document.createElement('div');
-            filterContainer.className = 'filter-container mb-4';
-            
-            const searchInput = document.createElement('input');
-            searchInput.type = 'text';
-            searchInput.className = 'filter-input w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500';
-            searchInput.placeholder = 'Search friends...';
-            searchInput.value = this.filterQuery || '';
-            
-            // Add event listener for input
-            searchInput.addEventListener('input', (e) => {
-                const target = e.target as HTMLInputElement;
-                this.filterFriends(target.value);
-            });
-            
-            filterContainer.appendChild(searchInput);
-            container.appendChild(filterContainer);
-        }
-
-        // Create content container
         const contentContainer = document.createElement('div');
         contentContainer.className = 'tab-content';
 
-        // Set the content based on active tab
         if (this.activeTab === 'friends') {
             contentContainer.appendChild(this.renderFriends());
         } else {
@@ -248,7 +201,6 @@ export class FriendList {
         container.appendChild(contentContainer);
         this.props.container.appendChild(container);
 
-        // Add event listeners after rendering
         this.addEventListeners();
     }
 
@@ -274,11 +226,9 @@ export class FriendList {
             listItem.className = 'friend-item p-4 flex items-center justify-between';
             listItem.dataset.userId = friend.id.toString();
             
-            // User info section
             const userInfo = document.createElement('div');
             userInfo.className = 'flex items-center space-x-3';
             
-            // Avatar container
             const avatarContainer = document.createElement('div');
             avatarContainer.className = 'relative h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center';
             
@@ -296,12 +246,10 @@ export class FriendList {
                 avatarContainer.appendChild(avatarInitial);
             }
             
-            // Online status indicator
             const statusIndicator = document.createElement('span');
             statusIndicator.className = `absolute bottom-0 right-0 h-3 w-3 rounded-full ${friend.is_online ? 'bg-green-500' : 'bg-gray-400'}`;
             avatarContainer.appendChild(statusIndicator);
             
-            // User details
             const userDetails = document.createElement('div');
             
             const userName = document.createElement('h4');
@@ -318,7 +266,6 @@ export class FriendList {
             userInfo.appendChild(avatarContainer);
             userInfo.appendChild(userDetails);
             
-            // Action buttons
             const actionButtons = document.createElement('div');
             actionButtons.className = 'flex space-x-2';
             
@@ -335,11 +282,9 @@ export class FriendList {
             actionButtons.appendChild(viewProfileButton);
             actionButtons.appendChild(removeButton);
             
-            // Assemble the list item
             listItem.appendChild(userInfo);
             listItem.appendChild(actionButtons);
             
-            // Add to list
             friendsList.appendChild(listItem);
         });
         
@@ -366,11 +311,9 @@ export class FriendList {
             listItem.className = 'pending-request-item p-4 flex items-center justify-between';
             listItem.dataset.userId = request.id.toString();
             
-            // User info section
             const userInfo = document.createElement('div');
             userInfo.className = 'flex items-center space-x-3';
             
-            // Avatar container
             const avatarContainer = document.createElement('div');
             avatarContainer.className = 'h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center';
             
@@ -388,7 +331,6 @@ export class FriendList {
                 avatarContainer.appendChild(avatarInitial);
             }
             
-            // User details
             const userDetails = document.createElement('div');
             
             const userName = document.createElement('h4');
@@ -405,7 +347,6 @@ export class FriendList {
             userInfo.appendChild(avatarContainer);
             userInfo.appendChild(userDetails);
             
-            // Action buttons
             const actionButtons = document.createElement('div');
             actionButtons.className = 'flex space-x-2';
             
@@ -422,11 +363,9 @@ export class FriendList {
             actionButtons.appendChild(acceptButton);
             actionButtons.appendChild(rejectButton);
             
-            // Assemble the list item
             listItem.appendChild(userInfo);
             listItem.appendChild(actionButtons);
             
-            // Add to list
             requestsList.appendChild(listItem);
         });
         
@@ -439,7 +378,6 @@ export class FriendList {
     }
 
     private addEventListeners(): void {
-        // Add tab click listeners
         const tabs = this.props.container.querySelectorAll('.tab');
         tabs.forEach(tab => {
             tab.addEventListener('click', (e) => {
@@ -451,7 +389,6 @@ export class FriendList {
             });
         });
 
-        // View profile buttons
         const viewProfileButtons = this.props.container.querySelectorAll('.view-profile');
         viewProfileButtons.forEach(button => {
             button.addEventListener('click', (e) => {
@@ -463,7 +400,6 @@ export class FriendList {
             });
         });
 
-        // Remove friend buttons
         const removeFriendButtons = this.props.container.querySelectorAll('.remove-friend');
         removeFriendButtons.forEach(button => {
             button.addEventListener('click', async (e) => {
@@ -475,7 +411,6 @@ export class FriendList {
             });
         });
 
-        // Accept request buttons - Make sure this works
         const acceptButtons = this.props.container.querySelectorAll('.accept-request');
         console.log('Found accept buttons:', acceptButtons.length);
         
@@ -491,7 +426,6 @@ export class FriendList {
                 console.log('User ID to accept:', userId);
                 
                 if (userId) {
-                    // Show a visual indicator
                     buttonElement.textContent = 'Accepting...';
                     buttonElement.classList.add('opacity-50');
                     buttonElement.classList.add('pointer-events-none');
@@ -501,7 +435,6 @@ export class FriendList {
             });
         });
 
-        // Reject request buttons - Make sure this works
         const rejectButtons = this.props.container.querySelectorAll('.reject-request');
         console.log('Found reject buttons:', rejectButtons.length);
         
@@ -517,7 +450,6 @@ export class FriendList {
                 console.log('User ID to reject:', userId);
                 
                 if (userId) {
-                    // Show a visual indicator
                     buttonElement.textContent = 'Rejecting...';
                     buttonElement.classList.add('opacity-50');
                     buttonElement.classList.add('pointer-events-none');
@@ -532,10 +464,7 @@ export class FriendList {
         const token = AuthService.getInstance().getToken();
         if (!token) return;
         
-        // CORRECTED PATH: /api/protected/friends/:userId
-        const apiUrl = window.location.hostname === 'localhost' ? 
-            `http://${window.location.hostname}:4002/api/protected/friends/${userId}` :
-            `/api/protected/friends/${userId}`;
+        const apiUrl = `/api/protected/friends/${userId}`;
 
         try {
             const response = await fetch(apiUrl, {
@@ -560,25 +489,20 @@ export class FriendList {
         const token = AuthService.getInstance().getToken();
         if (!token) return;
         
-        // CORRECTED PATH: /api/protected/friends/:userId/accept
-        const apiUrl = window.location.hostname === 'localhost' ? 
-            `http://${window.location.hostname}:4002/api/protected/friends/${userId}/accept` :
-            `/api/protected/friends/${userId}/accept`;
+        const apiUrl = `/api/protected/friends/${userId}/accept`;
 
         try {
             const response = await fetch(apiUrl, {
-                method: 'PUT', // Correct method
+                method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                // Adding an empty object as body to satisfy the Content-Type requirement
                 body: JSON.stringify({})
             });
 
             console.log('Accept response status:', response.status, response.statusText);
             
-            // Try to read the response body
             let responseBody = null;
             try {
                 const responseText = await response.text();
@@ -607,25 +531,20 @@ export class FriendList {
         const token = AuthService.getInstance().getToken();
         if (!token) return;
         
-        // CORRECTED PATH: /api/protected/friends/:userId/reject
-        const apiUrl = window.location.hostname === 'localhost' ? 
-            `http://${window.location.hostname}:4002/api/protected/friends/${userId}/reject` :
-            `/api/protected/friends/${userId}/reject`;
+        const apiUrl = `/api/protected/friends/${userId}/reject`;
 
         try {
             const response = await fetch(apiUrl, {
-                method: 'PUT', // Correct method
+                method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                // Adding an empty object as body to satisfy the Content-Type requirement
                 body: JSON.stringify({})
             });
 
             console.log('Reject response status:', response.status, response.statusText);
             
-            // Try to read the response body
             let responseBody = null;
             try {
                 const responseText = await response.text();
@@ -668,11 +587,9 @@ export class FriendList {
         this.render();
     }
 
-    // Helper function to get the full avatar URL
     private getFullAvatarUrl(avatarUrl: string): string {
         if (!avatarUrl) return '';
         
-        // If it's a backend path like /avatars/filename.jpg, prepend the API URL base
         if (avatarUrl.startsWith('/avatars/')) {
             const baseUrl = API_URL.substring(0, API_URL.indexOf('/api'));
             return `${baseUrl}${avatarUrl}`;
@@ -680,4 +597,4 @@ export class FriendList {
         
         return avatarUrl;
     }
-} 
+}

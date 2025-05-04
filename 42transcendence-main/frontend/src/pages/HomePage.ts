@@ -1,4 +1,24 @@
+import { AuthService } from '../services/auth';
+
+// If not logged in, just play the gme. Else if logged in, will need title
 export function renderHomePage(container: HTMLElement): void {
+    const startGameWithTitle = (mode: 'single' | 'multi') => {
+        const authService = AuthService.getInstance();
+
+        if (authService.isAuthenticated()) {
+            const defaultTitle = `Pong Game (${new Date().toLocaleTimeString()})`;
+            const title = (prompt("Enter a title for this game session:", defaultTitle)).slice(0, 50);
+            if (title !== null) {
+                const finalTitle = title.trim() || defaultTitle;
+                const encodedTitle = encodeURIComponent(finalTitle);
+                console.log(`Navigating with mode: ${mode}, title: ${title}, finalTitle: ${finalTitle}, encodedTitle: ${encodedTitle}`);
+                (window as any).navigate(`/game?mode=${mode}&title=${encodedTitle}`);
+            }
+        } else {
+            (window as any).navigate(`/game?mode=${mode}`);
+        }
+    };
+    (window as any).startGameWithTitle = startGameWithTitle;
     container.innerHTML = `
         <div class="min-h-screen bg-gray-50">            
             <div class="bg-white rounded-lg shadow-xl p-8 max-w-4xl mx-auto mt-10">
@@ -9,7 +29,7 @@ export function renderHomePage(container: HTMLElement): void {
                     <div class="bg-blue-50 p-6 rounded-lg shadow-md max-w-sm w-full">
                         <h2 class="text-2xl font-bold text-blue-800 mb-3">Single View Mode</h2>
                         <p class="text-gray-700 mb-4">Classic pong game with a single view perspective.</p>
-                        <button onclick="navigate('/game?mode=single')" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-200">
+                        <button onclick="startGameWithTitle('single')" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-200">
                             Play Single View
                         </button>
                     </div>
@@ -17,7 +37,7 @@ export function renderHomePage(container: HTMLElement): void {
                     <div class="bg-purple-50 p-6 rounded-lg shadow-md max-w-sm w-full">
                         <h2 class="text-2xl font-bold text-purple-800 mb-3">Multi View Mode</h2>
                         <p class="text-gray-700 mb-4">Experience pong from multiple dynamic camera angles.</p>
-                        <button onclick="navigate('/game?mode=multi')" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded transition duration-200">
+                        <button onclick="startGameWithTitle('multi')" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded transition duration-200">
                             Play Multi View
                         </button>
                     </div>

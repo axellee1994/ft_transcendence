@@ -92,3 +92,16 @@ export const deleteFriend = async(fastify: FastifyInstance, ownid:number, friend
         throw new ServerRequestError({message : "DB Error"});
     }
 }
+
+export const getFriendshipStatusByUidOrFid = async(fastify:FastifyInstance, cid:number, uid:number) =>{
+  const defVal = <{status:string|null, direction:string|null}>{status: null, direction: null};
+  try {
+    const friendship = await fastify.db.get<{status:string, direction:string}>(
+      SQLStatement.FRIENDSHIP_GET_FRIEND_STATUS_BY_USERID_OR_FRIENDID,
+      [cid, cid, cid, uid, uid, cid]
+    );
+    return friendship ||defVal;
+  } catch (error) {
+    throw new ServerRequestError({message : "DB Error"});
+  }
+}

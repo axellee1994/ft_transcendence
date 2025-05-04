@@ -2,7 +2,6 @@ import { FastifyInstance } from "fastify"
 import SQLStatement from "../SQLStatement"
 import { IGame } from "../model/gamesModel";
 import ServerRequestError from "../error/ServerRequestError";
-import { updateUserStats as updateUserStatsSvc } from "./userStatsSvc";
 
 export const getGames = async(fastify : FastifyInstance) => {
     try {
@@ -92,11 +91,12 @@ export const getActiveGameforPlayer = async(fastify:FastifyInstance, p1Id : numb
 }
 
 
-export const insertPlayerRecord = async(fastify:FastifyInstance, p1id:number, gid:number, p2id:number|null, result:string) => {
+export const insertPlayerRecord = async(fastify:FastifyInstance, p1id:number, gid:number, p2id:number|null, result:string, game_title: string | null) => {
     if (gid == -1)
         return;
     try {
-        await fastify.db.run(SQLStatement.GAME_INSERT_PLAYER_RECORD, [p1id, gid, p2id, result]);
+        fastify.log.info(`Inserting into match_history: user=${p1id}, game=${gid}, opponent=${p2id}, result=${result}, title=[${game_title}]`);
+        await fastify.db.run(SQLStatement.GAME_INSERT_PLAYER_RECORD, [p1id, gid, p2id, result, game_title]);
     } catch (error) {
         throw new ServerRequestError({message : "DB Error"});
     }
@@ -116,23 +116,77 @@ export const insertCompletedGameRecord = async(fastify:FastifyInstance, p1id:num
 }
 
 
-// Helper function to update player stats using the userStatsSvc
+// Helper function to update player stats
 export async function updatePlayerStats(fastifyInstance : FastifyInstance, playerId : number, isWinner:boolean) {
     try {
-        // Prepare the payload for userStatsSvc.updateUserStats
-        const updates = {
-            games_played: 1, // Always increment games_played
-            games_won: isWinner ? 1 : 0 // Increment games_won if they are the winner
-        };
-
-        // Call the service function to update/create stats
-        // Note: This assumes updateUserStatsSvc increments values if they exist.
-        // If it overwrites, the logic here or in updateUserStatsSvc needs adjustment.
-        await updateUserStatsSvc(fastifyInstance.db, playerId, updates);
+        const stats = await fastifyInstance.db.get(SQLStatement.GAME_PLAYED_WON_BY_ID, playerId);
         
+        if (stats) {
+            await fastifyInstance.db.run(SQLStatement.GAME_UPDATE_USER_STAT, [isWinner ? 1 : 0, playerId]);
+        } else {
+            await fastifyInstance.db.run(SQLStatement.GAME_CREATE_USER_STAT, [playerId, isWinner ? 1 : 0]);
+        }
     } catch (err: unknown) {
       if (err instanceof Error)
-        fastifyInstance.log.error(`Error updating player stats for user ${playerId}: ${err.message}`);
-        // Don't throw so that the main transaction can still complete
+        fastifyInstance.log.error(`Error updating player stats: ${err.message}`);
     }
-} 
+  } 
+
+
+export const getGamesHistoryByUserID = async(fastify : FastifyInstance, userid:number) =>{
+  try {
+    const matches = await fastify.db.all<IGame[]>(SQLStatement.GAME_GET_GAME_HIST_USERID, [userid, userid]);
+    return matches;
+  } catch (error) {
+    throw new ServerRequestError({message : "DB Error"});
+  }
+}
+
+
+export const updateTournamentMatchResult = async(fastify : FastifyInstance, player1_score:number, player2_score:number, winner_id:number, tournamentMatchId:number) =>
+{
+    try 
+    {
+        await fastify.db.run(SQLStatement.TOURNA_UPDATE_MATCH_RESULT, player1_score, player2_score, winner_id, tournamentMatchId);
+    } 
+    catch (error) 
+    {
+        throw new ServerRequestError({message : "DB Error"});
+    }
+}
+
+export const getTournamentMatch = async (fastify:FastifyInstance, tournamentMatchId:number) =>
+{
+    try
+    {
+        return await fastify.db.get(SQLStatement.TOURNA_GET_MATCH, tournamentMatchId);
+    }
+    catch(error:unknown)
+    {
+        throw new ServerRequestError({message:"DB Error"});
+    }
+}
+
+export const getTournamentNextRoundMatches = async(fastify:FastifyInstance, round: number, tournamentId:number) =>
+{
+    try
+    {
+        const matches = await fastify.db.all(SQLStatement.TOURNA_NEXT_ROUND_MATCHES, round, tournamentId);
+        return matches;
+    }
+    catch(error:unknown){
+        throw new ServerRequestError({message:"DB Error"});
+    }
+}
+
+export const updateNextRoundMatchPlayer = async(fastify : FastifyInstance, player1_id:number, player2_id:number, tournamentMatchId:number) =>
+{
+    try 
+    {
+        await fastify.db.run(SQLStatement.TOURNA_UPDATE_NEXT_ROUND_PLAYER, player1_id, player2_id, tournamentMatchId);
+    } 
+    catch (error) 
+    {
+        throw new ServerRequestError({message : "DB Error"});
+    }
+}

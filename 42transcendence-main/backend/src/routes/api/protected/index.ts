@@ -6,6 +6,8 @@ import matchHistoryRoutes from "./match-history";
 import userStatsRoutes from "./user-stats";
 import authSessionRoutes from "./auth";
 import userRoutes from "./user";
+import tournamentRoutes from "./tournaments";
+import { setOnlineStatusByID } from "../../../service/userSvc";
 
 declare module 'fastify' {
   export interface FastifyRequest {
@@ -24,6 +26,10 @@ const authIndex: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
       if (err)
         reply.code(401).send({msg:"ununauthorized"});
       request.userid = decoded.id;
+      setOnlineStatusByID(fastify, decoded.id, true)
+      .catch((error:unknown)=>{
+        reply.code(500).send({error :"Server error"});
+      });
     });
   });
 
@@ -43,12 +49,16 @@ const authIndex: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
     prefix : "/match-history"
   });
 
+  fastify.register(tournamentRoutes,{
+    prefix : "/tournaments"
+  });
+
   fastify.register(userStatsRoutes,{
     prefix : "/user-stats"
   });
 
-  fastify.register(userRoutes, {
-    prefix: "/users"
+  fastify.register(userRoutes,{
+    prefix : "/users"
   });
 
 }

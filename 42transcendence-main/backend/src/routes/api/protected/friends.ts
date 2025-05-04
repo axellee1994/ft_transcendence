@@ -48,20 +48,17 @@ const friendRoutes:FastifyPluginAsync = async(fastify, options) =>{
   }>('/:userId', async (request, reply) => {
       try {
           const { userId } = request.params;
-          // Check if user exists
           const user = await getUserByID(fastify, userId);
           if (!user) {
               reply.code(404).send({ error: 'User not found' });
               return;
           }
-          // Check if friendship already exists
           const existing = await isFriend(fastify, request.userid, userId);
           if (existing) {
               reply.code(409).send({ error: 'Friendship already exists' });
               return;
           }
           
-          // Create friendship request
           await sendFriendReq(fastify, request.userid, userId);
           reply.code(201).send({ message: 'Friend request sent' });
       } catch (err) {
@@ -120,7 +117,6 @@ const friendRoutes:FastifyPluginAsync = async(fastify, options) =>{
               reply.code(400).send({ error: 'Invalid friend request status' });
               return;
           }
-          // Delete the friendship record instead of marking it as rejected
           await deleteFriendReq(fastify, friendship.id);
           reply.code(200).send({ message: 'Friend request rejected' });
       } catch (err) {
@@ -134,12 +130,16 @@ const friendRoutes:FastifyPluginAsync = async(fastify, options) =>{
     Params:{userId:number},
     Reply:{
       204 : void
+      400 : {error : string}
       500 : {error : string}
     }
   
   }>('/:userId', async (request, reply) => {
       try {
           const { userId } = request.params;
+          const exist = await isFriend(fastify, request.userid, userId);
+          if (!exist)
+              return reply.code(400).send({error: "bad request"});
           await deleteFriend(fastify, request.userid, userId);
           reply.code(204).send();
       } catch (err) {

@@ -90,6 +90,12 @@ module.exports = {
       overlay: true,
       progress: true
     },
-    liveReload: true
+    liveReload: true,
+    proxy:[
+      {
+        context: ['/api'],
+        target: 'http://localhost:3000',
+      }
+    ],
   }
 }; 

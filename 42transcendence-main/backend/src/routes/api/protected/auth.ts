@@ -32,7 +32,10 @@ const authSessionRoutes : FastifyPluginAsync = async(fastify, options) =>{
               email: user.email,
               avatar_url: user.avatar_url,
               wins: user.wins,
-              losses: user.losses
+              losses: user.losses,
+              is_2fa_enabled: Boolean(user.is_2fa_enabled),
+              display_name : user.display_name,
+              is_remote_user: Boolean(user.is_remote_user)
           });
       } catch (error) {
           fastify.log.error(error);
@@ -55,11 +58,8 @@ const authSessionRoutes : FastifyPluginAsync = async(fastify, options) =>{
     }
   } ,async (request, reply) => {
       try {
-          // Set user as offline
           await setOnlineStatusByID(fastify, request.userid, false);
           
-          // In a real application, you might want to invalidate the token
-          // For now, we'll just send a success response
           reply.code(200).send({ message: 'Logged out successfully' });
       } catch (error) {
           fastify.log.error(error);

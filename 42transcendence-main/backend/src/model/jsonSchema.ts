@@ -18,19 +18,42 @@ export const regBodySchema = {
     user: {
       type: 'object',
       properties: {
-        id: { type: 'string' },
-        username: { type: 'string' },
-        email: { type: 'string' },
-        display_name: { type: 'string' },
-        is_online: { type: 'boolean' },
-        last_seen: { type: 'string' }
+        id: { type: ['integer', 'null'] },
+        username: { type: ['string', 'null']},
+        email: { type: ['string', 'null']},
+        display_name: { type: ['string', 'null']},
+        is_online: { type: ['boolean', 'null'] },
+        last_seen: { type: ['string', 'null']},
+        is_2fa_enabled: {type: ['boolean', 'null']},
+        avatar_url: { type : ['string', 'null'] },
+        is_remote_user: {type: ['boolean', 'null']},
       }
     },
-    token: { type: 'string' }
+    token: { type: ['string', 'null'] }
   }
 }
 
-// /api/protected/auth
+export const loginBodySchema = {
+  type: 'object',
+  properties: {
+    user: {
+      type: 'object',
+      properties: {
+        id: { type: ['integer', 'null'] },
+        username: { type: ['string', 'null']},
+        email: { type: ['string', 'null']},
+        avatar_url: { type : ['string', 'null'] },
+        display_name: { type: ['string', 'null']},
+        is_online: { type: ['boolean', 'null'] },
+        last_seen: { type: ['string', 'null']},
+        is_2fa_enabled: {type: ['boolean', 'null']},
+        is_remote_user: {type: ['boolean', 'null']}
+      }
+    },
+    token: { type: ['string', 'null'] }
+  }
+}
+
 export const meSchema = {
   type : 'object',
   properties : {
@@ -39,7 +62,10 @@ export const meSchema = {
     email : {type:'string'},
     avatar_url: {type : 'string'},
     wins : {type: 'integer'},
-    losses : {type : 'integer'}
+    losses : {type : 'integer'},
+    is_2fa_enabled : {type : 'boolean'},
+    display_name : {type : 'string'},
+    is_remote_user : {type : 'boolean'}
   }
 }
 
@@ -61,6 +87,7 @@ export const gameSchema = {
 };
 
 
+
 export const leaderboardSchema = {
   type: 'array',
   items: {
@@ -77,7 +104,6 @@ export const leaderboardSchema = {
   }
 };
 
-// Tournament schema for validation and responses
 export const tournamentSchema = {
   type: 'object',
   properties: {
@@ -89,11 +115,11 @@ export const tournamentSchema = {
     status: { type: 'string', enum: ['pending', 'active', 'completed'] },
     winner_id: { type: ['integer', 'null'] },
     created_at: { type: 'string', format: 'date-time' },
-    updated_at: { type: 'string', format: 'date-time' }
+    updated_at: { type: 'string', format: 'date-time' },
+    max_players: { type: 'number' }
   }
 };
 
-  // Tournament participant schema
 export const participantSchema = {
   type: 'object',
   properties: {
@@ -109,7 +135,6 @@ export const participantSchema = {
 export const userStatsSchema = {
   type: 'object',
   properties: {
-      id: { type: 'integer' },
       user_id: { type: 'integer' },
       games_played: { type: 'integer' },
       games_won: { type: 'integer' },
@@ -128,12 +153,35 @@ export const userSchema = {
       id: { type: 'integer' },
       username: { type: 'string' },
       email: { type: 'string', format: 'email' },
+      display_name: {type:'string'},
       avatar_url: { type: 'string' },
       wins: { type: 'integer' },
       losses: { type: 'integer' },
       is_online: { type: 'boolean' },
       last_seen: { type: 'string', format: 'date-time' },
       created_at: { type: 'string', format: 'date-time' },
-      updated_at: { type: 'string', format: 'date-time' }
+      updated_at: { type: 'string', format: 'date-time' },
+      is_2fa_enabled: { type: 'boolean'},
+      is_remote_user: { type: 'boolean'}
   }
 };
+
+export const userOnlineStatusSchema = {
+  type : 'object',
+  properties :{
+    id : {type: 'number'},
+    username : {type : 'string'},
+    is_online : {type : 'string'},
+    last_seen : {type : 'string'},
+  }
+}
+
+
+export const userOnlineStatusByUsernameOrDisplayNameSchema = {
+  type : 'object',
+  properties :{
+    ...userOnlineStatusSchema.properties,
+    display_name : {type : 'string'},
+    avatar_url : {type : 'string'}
+  }
+}

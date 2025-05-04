@@ -19,11 +19,9 @@ interface FriendSearchProps {
     onViewProfile?: (userId: number) => void;
 }
 
-// Helper function to get the full avatar URL
 function getFullAvatarUrl(avatarUrl: string): string {
     if (!avatarUrl) return '';
     
-    // If it's a backend path like /avatars/filename.jpg, prepend the API URL base
     if (avatarUrl.startsWith('/avatars/')) {
         const baseUrl = API_URL.substring(0, API_URL.indexOf('/api'));
         return `${baseUrl}${avatarUrl}`;
@@ -114,10 +112,12 @@ export class FriendSearch {
                                 <p class="text-sm text-gray-500">@${user.username}</p>
                             </div>
                         </div>
-                        <div class="flex space-x-2">
+
+                         <div class="flex space-x-2">
                             ${this.renderActionButton(user.id)}
-                            <button class="view-profile bg-blue-100 text-blue-600 px-3 py-1 rounded hover:bg-blue-200 transition-colors text-sm" data-user-id="${user.id}">View Profile</button>
+                            
                         </div>
+                       
                     </li>
                 `).join('')}
             </ul>
@@ -150,7 +150,6 @@ export class FriendSearch {
     }
 
     private addEventListeners(): void {
-        // Search button
         const searchButton = this.props.container.querySelector('#search-button');
         if (searchButton) {
             searchButton.addEventListener('click', () => {
@@ -158,7 +157,6 @@ export class FriendSearch {
             });
         }
 
-        // Search input (search on enter)
         const searchInput = this.props.container.querySelector('#search-input');
         if (searchInput) {
             searchInput.addEventListener('keyup', (e: KeyboardEvent) => {
@@ -169,7 +167,6 @@ export class FriendSearch {
             });
         }
 
-        // Add friend buttons
         const addFriendButtons = this.props.container.querySelectorAll('.add-friend');
         addFriendButtons.forEach(button => {
             button.addEventListener('click', async (e) => {
@@ -180,7 +177,6 @@ export class FriendSearch {
             });
         });
 
-        // Remove friend buttons
         const removeFriendButtons = this.props.container.querySelectorAll('.remove-friend');
         removeFriendButtons.forEach(button => {
             button.addEventListener('click', async (e) => {
@@ -191,7 +187,6 @@ export class FriendSearch {
             });
         });
 
-        // Accept request buttons
         const acceptButtons = this.props.container.querySelectorAll('.accept-request');
         acceptButtons.forEach(button => {
             button.addEventListener('click', async (e) => {
@@ -202,7 +197,6 @@ export class FriendSearch {
             });
         });
 
-        // Reject request buttons
         const rejectButtons = this.props.container.querySelectorAll('.reject-request');
         rejectButtons.forEach(button => {
             button.addEventListener('click', async (e) => {
@@ -213,7 +207,6 @@ export class FriendSearch {
             });
         });
 
-        // View profile buttons
         const viewProfileButtons = this.props.container.querySelectorAll('.view-profile');
         viewProfileButtons.forEach(button => {
             button.addEventListener('click', (e) => {
@@ -244,13 +237,9 @@ export class FriendSearch {
                 return;
             }
 
-            // Get current user data to filter out from results
             const currentUser = authService.getCurrentUser();
             
-            // CORRECTED PATH: Use /api/protected/users/search
-            const apiUrl = window.location.hostname === 'localhost' ? 
-                `http://${window.location.hostname}:4002/api/protected/users/search?query=${encodeURIComponent(this.searchQuery)}` : 
-                `/api/protected/users/search?query=${encodeURIComponent(this.searchQuery)}`;
+            const apiUrl = `/api/protected/users/search?query=${encodeURIComponent(this.searchQuery)}`;;
 
             const response = await fetch(apiUrl, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -266,14 +255,12 @@ export class FriendSearch {
                 try {
                     let results = JSON.parse(responseText);
                     
-                    // Filter out the current user from search results
                     if (currentUser && currentUser.id) {
                         results = results.filter((user: any) => user.id !== currentUser.id);
                     }
                     
                     this.searchResults = results;
                     
-                    // Fetch friendship status for each user
                     await Promise.all(this.searchResults.map(async (user) => {
                         await this.fetchFriendshipStatus(user.id);
                     }));
@@ -298,10 +285,7 @@ export class FriendSearch {
             const authService = AuthService.getInstance();
             const token = authService.getToken();
             
-            // CORRECTED PATH: Check friendship status via protected user route
-            const apiUrl = window.location.hostname === 'localhost' ? 
-                `http://${window.location.hostname}:4002/api/protected/users/${userId}/friendship` : 
-                `/api/protected/users/${userId}/friendship`;
+            const apiUrl = `/api/protected/users/${userId}/friendship`;
             
             const response = await fetch(apiUrl, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -328,10 +312,7 @@ export class FriendSearch {
             const authService = AuthService.getInstance();
             const token = authService.getToken();
             
-            // CORRECTED PATH: Send request via protected friends route
-            const apiUrl = window.location.hostname === 'localhost' ?
-                `http://${window.location.hostname}:4002/api/protected/friends/${userId}` :
-                `/api/protected/friends/${userId}`;
+            const apiUrl = `/api/protected/friends/${userId}`;
             
             const response = await fetch(apiUrl, {
                 method: 'POST', // Correct method
@@ -343,7 +324,6 @@ export class FriendSearch {
                 throw new Error(errorData.error || 'Failed to send friend request');
             }
 
-            // Update the friendship status in our map
             this.friendshipStatuses.set(userId, { status: 'pending', direction: 'outgoing' });
             this.render();
             alert('Friend request sent successfully!');
@@ -354,16 +334,16 @@ export class FriendSearch {
     }
 
     private async removeFriend(userId: number): Promise<void> {
+
+        const apiUrl = `/api/protected/friends/${userId}`;
+
         try {
             const authService = AuthService.getInstance();
             const token = authService.getToken();
             
-            // CORRECTED PATH: Remove/Cancel via protected friends route
-            const response = await fetch(window.location.hostname === 'localhost' ? 
-                                            `http://${window.location.hostname}:4002/api/protected/friends/${userId}` : 
-                                            `/api/protected/friends/${userId}`, 
+            const response = await fetch(apiUrl, 
             {
-                method: 'DELETE', // Correct method
+                method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -371,7 +351,6 @@ export class FriendSearch {
                 throw new Error('Failed to remove friend');
             }
 
-            // Update the friendship status in our map
             this.friendshipStatuses.set(userId, { status: null, direction: null });
             this.render();
         } catch (err) {
@@ -381,16 +360,16 @@ export class FriendSearch {
     }
 
     private async acceptFriendRequest(userId: number): Promise<void> {
+
+        const apiUrl = `/api/protected/friends/${userId}/accept`;
+        
         try {
             const authService = AuthService.getInstance();
             const token = authService.getToken();
             
-            // CORRECTED PATH: Accept via protected friends route
-            const response = await fetch(window.location.hostname === 'localhost' ? 
-                                            `http://${window.location.hostname}:4002/api/protected/friends/${userId}/accept` : 
-                                            `/api/protected/friends/${userId}/accept`, 
+            const response = await fetch(apiUrl, 
             {
-                method: 'PUT', // Correct method
+                method: 'PUT',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -398,7 +377,6 @@ export class FriendSearch {
                 throw new Error('Failed to accept friend request');
             }
 
-            // Update the friendship status in our map
             this.friendshipStatuses.set(userId, { status: 'accepted', direction: 'incoming' });
             this.render();
         } catch (err) {
@@ -408,14 +386,14 @@ export class FriendSearch {
     }
 
     private async rejectFriendRequest(userId: number): Promise<void> {
+
+        const apiUrl = `/api/protected/friends/${userId}/reject`;
+        
         try {
             const authService = AuthService.getInstance();
             const token = authService.getToken();
             
-            // CORRECTED PATH: Reject via protected friends route
-            const response = await fetch(window.location.hostname === 'localhost' ? 
-                                            `http://${window.location.hostname}:4002/api/protected/friends/${userId}/reject` : 
-                                            `/api/protected/friends/${userId}/reject`, 
+            const response = await fetch(apiUrl, 
             {
                 method: 'PUT', // Correct method
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -425,7 +403,6 @@ export class FriendSearch {
                 throw new Error('Failed to reject friend request');
             }
 
-            // Update the friendship status in our map
             this.friendshipStatuses.set(userId, { status: null, direction: null });
             this.render();
         } catch (err) {
@@ -433,4 +410,4 @@ export class FriendSearch {
             alert('Failed to reject friend request. Please try again.');
         }
     }
-} 
+}

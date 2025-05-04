@@ -3,7 +3,6 @@ export class NotificationService {
     private container: HTMLDivElement | null = null;
 
     private constructor() {
-        // Create notification container
         this.createContainer();
     }
 
@@ -15,13 +14,11 @@ export class NotificationService {
     }
 
     private createContainer() {
-        // Check if container already exists
         if (document.getElementById('global-notification-container')) {
             this.container = document.getElementById('global-notification-container') as HTMLDivElement;
             return;
         }
 
-        // Create container
         this.container = document.createElement('div');
         this.container.id = 'global-notification-container';
         this.container.style.position = 'fixed';
@@ -37,7 +34,6 @@ export class NotificationService {
             this.createContainer();
         }
 
-        // Create notification element
         const notification = document.createElement('div');
         notification.style.backgroundColor = '#f56565';
         notification.style.color = 'white';
@@ -50,21 +46,17 @@ export class NotificationService {
         notification.style.transform = 'translateY(-20px)';
         notification.textContent = message;
 
-        // Add to container
         this.container!.appendChild(notification);
 
-        // Show with animation
         setTimeout(() => {
             notification.style.opacity = '1';
             notification.style.transform = 'translateY(0)';
         }, 10);
 
-        // Remove after duration
         setTimeout(() => {
             notification.style.opacity = '0';
             notification.style.transform = 'translateY(-20px)';
             
-            // Remove from DOM after animation completes
             setTimeout(() => {
                 if (notification.parentNode) {
                     notification.parentNode.removeChild(notification);

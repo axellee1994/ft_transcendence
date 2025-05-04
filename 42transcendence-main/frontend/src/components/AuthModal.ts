@@ -1,3 +1,5 @@
+import { initializeGoogleSignIn } from '../services/googlesignin';
+
 interface AuthModalProps {
     container: HTMLElement;
 }
@@ -7,7 +9,11 @@ export class AuthModal {
     private isLoginMode: boolean = true;
     public onLogin?: (username: string, password: string) => Promise<void>;
     public onRegister?: (username: string, password: string, email: string) => Promise<void>;
-
+    private username: string;
+    private password: string;
+    private isTwofa: boolean = false;
+    public onLogin2fa?: (username: string, password: string, twofaCode: number) => Promise<void>;
+     
     constructor(props: AuthModalProps) {
         this.container = props.container;
         this.initialize();
@@ -34,13 +40,13 @@ export class AuthModal {
                     <form class="login-form space-y-4" novalidate>
                         <div class="form-group">
                             <label for="login-username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                            <input type="text" id="login-username" required minlength="3"
+                            <input type="text" id="login-username" required minlength="3" maxlength="20"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Enter your username">
                         </div>
                         <div class="form-group">
                             <label for="login-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                            <input type="password" id="login-password" required minlength="6"
+                            <input type="password" id="login-password" required minlength="6" maxlength="12"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Enter your password">
                         </div>
@@ -49,6 +55,9 @@ export class AuthModal {
                             <p class="text-xs text-red-500 font-medium"></p>
                         </div>
                         <div class="flex justify-end space-x-3">
+                            <button id="google-sign-in" type="button" class="w-full px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors">
+                            Sign in with Google
+                            </button>
                             <button type="button" class="switch-to-register px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
                                 Register
                             </button>
@@ -62,23 +71,24 @@ export class AuthModal {
                     <form class="register-form hidden space-y-4" novalidate>
                         <div class="form-group">
                             <label for="register-username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                            <input type="text" id="register-username" required minlength="3"
+                            <input type="text" id="register-username" required minlength="3" maxlength="20"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Choose a username">
-                            <p class="text-xs text-gray-500 mt-1">Minimum 3 characters</p>
+                            <p class="text-xs text-gray-500 mt-1">Min 3, Max 20 characters</p>
                         </div>
                         <div class="form-group">
                             <label for="register-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                            <input type="password" id="register-password" required minlength="6"
+                            <input type="password" id="register-password" required minlength="6" maxlength="12"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Create a password">
-                            <p class="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+                            <p class="text-xs text-gray-500 mt-1">Min 6, Max 12 characters</p>
                         </div>
                         <div class="form-group">
                             <label for="register-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                            <input type="email" id="register-email" required
+                            <input type="email" id="register-email" required minlength="1" maxlength="50"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="Enter your email">
+                                <p class="text-xs text-gray-500 mt-1">Max 50 characters</p>
                         </div>
                         <div class="flex justify-end space-x-3">
                             <button type="button" class="switch-to-login px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
@@ -89,12 +99,37 @@ export class AuthModal {
                             </button>
                         </div>
                     </form>
+
+
+                    <!-- 2FA Form -->
+                    <form class="twofa-form hidden space-y-4" novalidate>
+                        <div class="form-group">
+                            <label for="twofa_code" class="block text-sm font-medium text-gray-700 mb-1">2FA - One Time Passcode</label>
+                            <input type="text" id="twofa_code" required minlength="6" maxlength="6"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Enter OTP">
+                            <p class="text-xs text-gray-500 mt-1">Only 6 digits</p>
+                        </div>
+                        <!-- 2FA Login error message container below 2FA field -->
+                        <div class="twofa-login-error-container hidden">
+                            <p class="text-xs text-red-500 font-medium"></p>
+                        </div>
+                        <div class="flex justify-end space-x-3">
+                            <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors">
+                                Submit
+                            </button>
+                        </div>
+                    </form>
+
                 </div>
             </div>
         `;
 
+        this.initializeGoogleSignIn();
         this.addEventListeners();
         this.show();
+        this.clearLocalstorageTwofa();
+
     }
 
     private addEventListeners(): void {
@@ -104,6 +139,9 @@ export class AuthModal {
         const switchToRegisterButton = this.container.querySelector('.switch-to-register');
         const switchToLoginButton = this.container.querySelector('.switch-to-login');
         const modalTitle = this.container.querySelector('.modal-title');
+        const twofaForm = this.container.querySelector('.twofa-form');
+        
+
 
         if (switchToRegisterButton && switchToLoginButton && loginForm && registerForm && modalTitle) {
             switchToRegisterButton.addEventListener('click', () => {
@@ -122,26 +160,21 @@ export class AuthModal {
         }
 
         if (loginForm) {
-            // Add input validation on blur/focus events for instant feedback
             const usernameInput = this.container.querySelector('#login-username') as HTMLInputElement;
             const passwordInput = this.container.querySelector('#login-password') as HTMLInputElement;
-            
-            // Validate username on blur
+
             usernameInput.addEventListener('blur', () => {
                 this.validateLoginField(usernameInput, 'Username');
             });
             
-            // Clear error on focus
             usernameInput.addEventListener('focus', () => {
                 this.clearFieldError(usernameInput);
             });
             
-            // Validate password on blur
             passwordInput.addEventListener('blur', () => {
                 this.validateLoginField(passwordInput, 'Password');
             });
             
-            // Clear error on focus
             passwordInput.addEventListener('focus', () => {
                 this.clearFieldError(passwordInput);
             });
@@ -149,29 +182,30 @@ export class AuthModal {
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const submitButton = loginForm.querySelector('button[type="submit"]') as HTMLButtonElement;
+                const registerButton = loginForm.querySelector('.switch-to-register') as HTMLButtonElement;
                 
-                // Clear previous error
+                registerButton.disabled = true;
+
+                usernameInput.value = usernameInput.value.trim();
+
                 this.clearError();
                 
-                // Track if we have validation errors
+            
                 let hasErrors = false;
                 
-                // Validate username
                 if (!this.validateLoginField(usernameInput, 'Username')) {
                     hasErrors = true;
                 }
                 
-                // Validate password - perform this validation regardless of username status
                 if (!this.validateLoginField(passwordInput, 'Password')) {
                     hasErrors = true;
                 }
                 
-                // Stop if we have errors
                 if (hasErrors) {
+                    registerButton.disabled = false;
                     return;
                 }
                 
-                // Remove any field error styling
                 this.clearFieldErrors();
                 
                 submitButton.disabled = true;
@@ -183,7 +217,67 @@ export class AuthModal {
 
                     if (this.onLogin) {
                         await this.onLogin(username, password);
+                        registerButton.disabled = false;
+                        const twofa = localStorage.getItem('twofa');
+                        if (twofa)
+                        {
+                            this.username = username;
+                            this.password = password;
+                            this.isTwofa = true;
+                            this.clearLocalstorageTwofa();
+                            loginForm.classList.add('hidden');
+                            twofaForm.classList.remove('hidden');
+                        }
                     }
+                } catch (error) {
+                    this.showError(error instanceof Error ? error.message : 'Login failed');
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Login';
+                    registerButton.disabled = false;
+                }
+            });
+        }
+
+        if (twofaForm) {
+
+            const twofaInput = this.container.querySelector('#twofa_code') as HTMLInputElement;
+            
+            twofaInput.addEventListener('blur', () => {
+                this.validateTwofaField(twofaInput);
+            });
+            
+            twofaInput.addEventListener('focus', () => {
+                this.clearFieldError(twofaInput);
+            });
+            
+            twofaForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitButton = twofaForm.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+                this.clearError();
+                
+                let hasErrors = false;
+                
+                if (!this.validateTwofaField(twofaInput)) {
+                    hasErrors = true;
+                }
+                
+                if (hasErrors) {
+                    return;
+                }
+                
+                this.clearFieldErrors();
+                
+                submitButton.disabled = true;
+                submitButton.textContent = 'Logging in...';
+
+                try {
+                    const twofaCode = Number(twofaInput.value);
+
+                    if (this.onLogin2fa) {
+                        await this.onLogin2fa(this.username, this.password, twofaCode);
+                    }
+
                 } catch (error) {
                     this.showError(error instanceof Error ? error.message : 'Login failed');
                     submitButton.disabled = false;
@@ -193,37 +287,37 @@ export class AuthModal {
         }
 
         if (registerForm) {
-            // Add input validation on blur/focus events for instant feedback
+
             const usernameInput = this.container.querySelector('#register-username') as HTMLInputElement;
             const passwordInput = this.container.querySelector('#register-password') as HTMLInputElement;
             const emailInput = this.container.querySelector('#register-email') as HTMLInputElement;
-            
-            // Validate username on blur
+
+
             usernameInput.addEventListener('blur', () => {
                 this.validateRegisterField(usernameInput, 'Username');
             });
             
-            // Clear error on focus
+
             usernameInput.addEventListener('focus', () => {
                 this.clearFieldError(usernameInput);
             });
             
-            // Validate password on blur
+
             passwordInput.addEventListener('blur', () => {
                 this.validateRegisterField(passwordInput, 'Password');
             });
             
-            // Clear error on focus
+
             passwordInput.addEventListener('focus', () => {
                 this.clearFieldError(passwordInput);
             });
             
-            // Validate email on blur
+
             emailInput.addEventListener('blur', () => {
                 this.validateEmailField(emailInput);
             });
             
-            // Clear error on focus
+
             emailInput.addEventListener('focus', () => {
                 this.clearFieldError(emailInput);
             });
@@ -231,14 +325,14 @@ export class AuthModal {
             registerForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const submitButton = registerForm.querySelector('button[type="submit"]') as HTMLButtonElement;
-                
-                // Clear previous error
+
+                usernameInput.value = usernameInput.value.trim();
+                emailInput.value = emailInput.value.trim();
+
                 this.clearError();
-                
-                // Track if we have validation errors
+
                 let hasErrors = false;
                 
-                // Validate all fields independently
                 if (!this.validateRegisterField(usernameInput, 'Username')) {
                     hasErrors = true;
                 }
@@ -247,16 +341,18 @@ export class AuthModal {
                     hasErrors = true;
                 }
                 
+                if (!this.validateRegisterField(emailInput, 'Email')) {
+                    hasErrors = true;
+                }
+
                 if (!this.validateEmailField(emailInput)) {
                     hasErrors = true;
                 }
                 
-                // Stop if we have errors
                 if (hasErrors) {
                     return;
                 }
                 
-                // Remove any field error styling
                 this.clearFieldErrors();
                 
                 submitButton.disabled = true;
@@ -279,6 +375,15 @@ export class AuthModal {
         }
     }
 
+    private async initializeGoogleSignIn(): Promise<void> {
+        initializeGoogleSignIn();
+    }
+
+    private clearLocalstorageTwofa(): void
+    {
+        localStorage.removeItem('twofa');
+    }
+
     public show(): void {
         const modal = this.container.querySelector('.auth-modal');
         if (modal) {
@@ -294,13 +399,12 @@ export class AuthModal {
     }
 
     public showError(message: string): void {
-        // Reduce logging - just a single message
-        
-        // Determine which form is active
+
         const isLoginFormActive = !this.container.querySelector('.login-form')?.classList.contains('hidden');
+        const is2faLoginFormActive = !this.container.querySelector('.twofa-form')?.classList.contains('hidden');
+        
         
         if (isLoginFormActive) {
-            // Show error in the login form's error container
             const loginErrorContainer = this.container.querySelector('.login-error-container');
             const errorParagraph = loginErrorContainer?.querySelector('p');
             
@@ -308,12 +412,24 @@ export class AuthModal {
                 loginErrorContainer.classList.remove('hidden');
                 errorParagraph.textContent = message;
             } else {
-                // Fallback to alert if error container not found
                 console.error('Login error container not found in the DOM');
                 alert('Login Error: ' + message);
             }
-        } else {
-            // Use the old method for register form for now
+        } 
+        else if(is2faLoginFormActive) 
+        {
+            const twofaLoginErrorContainer = this.container.querySelector('.twofa-login-error-container');
+            const errorParagraph = twofaLoginErrorContainer?.querySelector('p');
+            
+            if (twofaLoginErrorContainer && errorParagraph) {
+                twofaLoginErrorContainer.classList.remove('hidden');
+                errorParagraph.textContent = message;
+            } else {
+                console.error('Login error container not found in the DOM');
+                alert('Login Error: ' + message);
+            }
+        } 
+        else {
             const errorElement = this.container.querySelector('.error-message');
             const errorText = this.container.querySelector('.error-text');
             
@@ -323,17 +439,20 @@ export class AuthModal {
                 return;
             }
             
-            // Make sure error is visible
             errorText.textContent = message;
             errorElement.classList.remove('hidden');
         }
         
-        // Automatically hide the error after 10 seconds
         setTimeout(() => {
             if (isLoginFormActive) {
                 const loginErrorContainer = this.container.querySelector('.login-error-container');
                 loginErrorContainer?.classList.add('hidden');
-            } else {
+            }
+            else if(is2faLoginFormActive) {
+                const twofaLoginErrorContainer = this.container.querySelector('.twofa-login-error-container');
+                twofaLoginErrorContainer?.classList.add('hidden');
+            } 
+            else {
                 const errorElement = this.container.querySelector('.error-message');
                 errorElement?.classList.add('hidden');
             }
@@ -346,13 +465,11 @@ export class AuthModal {
     }
 
     private clearError(): void {
-        // Clear the top banner error message
         const errorElement = this.container.querySelector('.error-message');
         if (errorElement) {
             errorElement.classList.add('hidden');
         }
-        
-        // Clear the login form error message
+
         const loginErrorContainer = this.container.querySelector('.login-error-container');
         if (loginErrorContainer) {
             loginErrorContainer.classList.add('hidden');
@@ -360,24 +477,20 @@ export class AuthModal {
     }
     
     private addFieldError(input: HTMLInputElement, message: string): void {
-        // Add red border
+
         input.classList.add('border-red-500');
         
-        // Check if error message element already exists
         let errorMsg = input.parentElement?.querySelector('.field-error-message');
         if (!errorMsg) {
-            // Create new error message element
             errorMsg = document.createElement('p');
             errorMsg.className = 'field-error-message text-xs text-red-500 mt-1';
             input.parentElement?.appendChild(errorMsg);
         }
         
-        // Set error message
         errorMsg.textContent = message;
     }
     
     private clearFieldErrors(): void {
-        // Remove all field error styling
         const inputs = this.container.querySelectorAll('input');
         inputs.forEach(input => {
             input.classList.remove('border-red-500');
@@ -389,13 +502,11 @@ export class AuthModal {
     }
 
     private validateLoginField(input: HTMLInputElement, fieldName: string): boolean {
-        // Empty check
         if (!input.value.trim()) {
             this.addFieldError(input, `${fieldName} is required`);
             return false;
         }
         
-        // Length check
         const minLength = input.minLength;
         if (minLength && input.value.trim().length < minLength) {
             this.addFieldError(input, `${fieldName} must be at least ${minLength} characters`);
@@ -414,16 +525,20 @@ export class AuthModal {
     }
 
     private validateRegisterField(input: HTMLInputElement, fieldName: string): boolean {
-        // Empty check
         if (!input.value.trim()) {
             this.addFieldError(input, `${fieldName} is required`);
             return false;
         }
         
-        // Length check
         const minLength = input.minLength;
         if (minLength && input.value.trim().length < minLength) {
             this.addFieldError(input, `${fieldName} must be at least ${minLength} characters`);
+            return false;
+        }
+
+        const maxLength = input.maxLength;
+        if (maxLength && input.value.trim().length > maxLength) {
+            this.addFieldError(input, `${fieldName} must be Max ${maxLength} characters`);
             return false;
         }
         
@@ -431,13 +546,11 @@ export class AuthModal {
     }
     
     private validateEmailField(input: HTMLInputElement): boolean {
-        // Empty check
         if (!input.value.trim()) {
             this.addFieldError(input, 'Email is required');
             return false;
         }
         
-        // Format check
         if (!this.isValidEmail(input.value.trim())) {
             this.addFieldError(input, 'Invalid email format');
             return false;
@@ -445,4 +558,35 @@ export class AuthModal {
         
         return true;
     }
-} 
+
+    private isAllDigits(str: string): boolean
+    {
+        return /^\d+$/.test(str);
+    }
+
+    private validateTwofaField(input: HTMLInputElement): boolean {
+        if (!input.value.trim()) {
+            this.addFieldError(input, '2FA code is required');
+            return false;
+        }
+        
+        const minLength = input.minLength;
+        if (minLength && input.value.trim().length < minLength) {
+            this.addFieldError(input, `2FA code must be ${minLength} digits`);
+            return false;
+        }
+
+        const maxLength = input.maxLength;
+        if (maxLength && input.value.trim().length > maxLength) {
+            this.addFieldError(input, `2FA code must be ${maxLength} digits`);
+            return false;
+        }
+
+        if (!this.isAllDigits(input.value.trim())) {
+            this.addFieldError(input, 'Invalid 2FA code');
+            return false;
+        }
+        
+        return true;
+    }
+}

@@ -1,7 +1,9 @@
-enum Estatus{
+export enum Estatus{
   pending = "pending",
   active = "active",
-  completed = "completed"
+  completed = "completed",
+  open = "open",
+  close = "close"
 }
 
 export interface ITournament{
@@ -14,4 +16,5 @@ export interface ITournament{
   winner_id ?: number
   created_at: string
   updated_at: string
+  max_players: number
 }

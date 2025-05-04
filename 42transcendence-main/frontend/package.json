@@ -6,7 +6,9 @@
   "scripts": {
     "start": "webpack serve --mode development --open",
     "dev": "webpack --mode development && serve -s dist -p 4000",
+    "prebuild" : "mkdir -m 777 -p ../backend/dist/public/ && rm -rf ../backend/dist/public/*",
     "build": "webpack --mode production",
+    "postbuild" : "cp ./dist/* ../backend/dist/public/",
     "test": "jest"
   },
   "dependencies": {

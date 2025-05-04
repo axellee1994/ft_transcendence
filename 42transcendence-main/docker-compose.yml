@@ -1,22 +1,24 @@
-# Removed version for compatibility
-
-x-compose-remove-orphans: true
-
 services:
-  # Backend Service Configuration (now includes frontend build)
-  backend: # Renamed service to 'app' or keep 'backend' - let's keep 'backend' for consistency with Makefile
-    build:
-      context: .
-      dockerfile: ./backend/Dockerfile
+  backend:
+    container_name: fastifyBackend
+    build: ./
     ports:
-      - "4002:4002"
+      - 3000:3000
+    env_file:
+      - ./backend/.env
     environment:
-      - NODE_ENV=production
-    init: true # Kept for now, might be removable
-    user: "root" # Kept for now, might be removable
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - PORT=${PORT}
+      - HOST=${HOST}
+      - HASHING_SECRET=${HASHING_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_TEMP_PW=${GOOGLE_TEMP_PW}
+    restart: always
 
-# Removed frontend service
-
-# Removed networks section as it's not explicitly used
-
-# Removed volumes section as it's not explicitly used
+# docker compose --env-file ./backend/.env up

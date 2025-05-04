@@ -1,25 +1,20 @@
 import { FriendList } from '../components/FriendList';
 
 export function renderFriendsPage(container: HTMLElement): void {
-    // Completely clear the container
     container.innerHTML = '';
     
-    // Create a clean main container
     const pageWrapper = document.createElement('div');
     pageWrapper.className = 'py-8';
     container.appendChild(pageWrapper);
     
-    // Create card container
     const cardContainer = document.createElement('div');
     cardContainer.className = 'max-w-6xl mx-auto px-4 sm:px-6 lg:px-8';
     pageWrapper.appendChild(cardContainer);
     
-    // Create the main content wrapper
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'bg-white rounded-lg shadow-xl p-8';
     cardContainer.appendChild(contentWrapper);
     
-    // Create header with title and Add Friend button
     const header = document.createElement('div');
     header.className = 'flex justify-between items-center mb-6';
     
@@ -46,7 +41,7 @@ export function renderFriendsPage(container: HTMLElement): void {
     
     buttonIcon.appendChild(iconPath);
     
-    const buttonText = document.createTextNode('Add Friend');
+    const buttonText = document.createTextNode('');
     addButton.appendChild(buttonIcon);
     addButton.appendChild(buttonText);
     
@@ -54,12 +49,10 @@ export function renderFriendsPage(container: HTMLElement): void {
     header.appendChild(addButton);
     contentWrapper.appendChild(header);
     
-    // Create friend list container
     const friendListContainer = document.createElement('div');
     friendListContainer.id = 'friend-list-container';
     contentWrapper.appendChild(friendListContainer);
     
-    // Initialize friend list component
     new FriendList({
         container: friendListContainer,
         onViewProfile: (userId) => {

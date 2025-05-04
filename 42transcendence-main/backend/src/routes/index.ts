@@ -1,17 +1,34 @@
 import { FastifyPluginAsync } from 'fastify'
-// import serveStatic from '@fastify/static'; // Commented out
-// import path from 'node:path'; // Commented out
+import serveStatic from '@fastify/static';
+import path from 'node:path';
+import fastifyHelmet from '@fastify/helmet';
 
 const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
-  // void fastify.register(serveStatic, { // Commented out
-  //   root: path.join(__dirname, 'public'), // Commented out
-  // }); // Commented out
+  void fastify.register(fastifyHelmet, {
+    global : true,
+    contentSecurityPolicy: {
+      directives: {
+        "script-src-attr": ["'unsafe-inline'"],
+        "imgSrc": ["'self'", 'data:', 'blob:']
+      },
+    }
+  })
 
-  // You can add root API routes here later if needed
-  // Example:
-  // fastify.get('/', async (request, reply) => {
-  //   return { message: 'Welcome to the API' };
-  // });
+  void fastify.register(serveStatic, {
+    root: path.join(__dirname, '../public'),
+  });
+
+
+  fastify.setNotFoundHandler((request, reply) => {
+    if (request.url.startsWith("/api/"))
+      return reply.code(404).send({
+        message: `Route ${request.method}:${request.url} not found`,
+        statusCode : 404,
+        error: "Not Found"
+    })
+    return reply.sendFile('index.html');
+  });
+
 }
 
 export default root;

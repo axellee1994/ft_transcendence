@@ -2,6 +2,9 @@ import { FastifyPluginAsync } from "fastify";
 import { errSchema, gameSchema } from "../../../model/jsonSchema";
 import { IGame } from "../../../model/gamesModel";
 import { getActiveGameforPlayer, getActiveGames, getGameById, getGames, insertCompletedGameRecord, insertGame, insertPlayerRecord, setGameStatusCompleted, updateGameByID, updatePlayerStats, upUserLose, upUserWin } from "../../../service/gameSvc";
+import { updateTournamentMatchResult, getTournamentMatch, getTournamentNextRoundMatches, updateNextRoundMatchPlayer } from "../../../service/gameSvc";
+import { updateTournamentStatus, updateTournamentWinner, getTournament } from "../../../service/tournamentSvc";
+
 
 const gameRoutes :FastifyPluginAsync = async(fastify, options) => {
 
@@ -157,16 +160,12 @@ const gameRoutes :FastifyPluginAsync = async(fastify, options) => {
               return;
           }
 
-          // If game is completed, update player stats
           if (updates.status === 'completed' && updates.winner_id) {
-              // Update winner stats
               await updatePlayerStats(fastify, updates.winner_id, true);
               
-              // Update loser stats
               const loserId = game.player1_id === updates.winner_id ? game.player2_id : game.player1_id;
               await updatePlayerStats(fastify, loserId, false);
               
-              // Keep the existing users table updates for backward compatibility
               await upUserWin(fastify, updates.winner_id);
               await upUserLose(fastify, loserId);
           }
@@ -210,7 +209,9 @@ const gameRoutes :FastifyPluginAsync = async(fastify, options) => {
       player1_score : number,
       player2_score : number,
       game_type : string,
-      winner : string
+      winner : string,
+      tournamentMatchId: number,
+      game_title?: string
     }
   }>('/results', {
       schema: {
@@ -221,11 +222,14 @@ const gameRoutes :FastifyPluginAsync = async(fastify, options) => {
                   player1_score: { type: 'integer' },
                   player2_score: { type: 'integer' },
                   game_type: { type: 'string', enum: ['single', 'multi'] },
-                  winner: { type: 'string', enum: ['player1', 'player2'] }
+                  winner: { type: 'string', enum: ['player1', 'player2'] },
+                  tournamentMatchId: { type: ['number', 'null']},
+                  game_title: { type: 'string', maxLength: 50 }
               }
           },
           response: {
-              201: gameSchema
+              201: gameSchema,
+              200: {}
           }
       }
   }, async (request, reply) => {
@@ -233,58 +237,117 @@ const gameRoutes :FastifyPluginAsync = async(fastify, options) => {
           fastify.log.info(`Received game results: ${JSON.stringify(request.body)}`);
           fastify.log.info(`User ID from token: ${request.userid}`);
           
-          const { player1_score, player2_score, game_type, winner } = request.body;
+          const { player1_score, player2_score, game_type, winner, tournamentMatchId, game_title } = request.body;
+          fastify.log.info(`Received game_title from request body: [${game_title}]`);
           const player1_id = request.userid;
           
-          let player2_id = -1; // Default to AI for single-player games
+          let player2_id = -1;
           
-          if (game_type === 'multi') {
-              // For multiplayer games, get the active game for this player
+          if (game_type === 'multi' && tournamentMatchId)
+          {
+            ;
+          }
+          else if (game_type === 'multi') {
               const activeGame = await getActiveGameforPlayer(fastify, player1_id, player1_id);
               if (activeGame) {
-                  // Set player2_id based on the active game
                   player2_id = activeGame.player1_id === player1_id ? activeGame.player2_id : activeGame.player1_id;
                   
-                  // Update the game status to completed
                   await setGameStatusCompleted(fastify, activeGame.id);
               } else {
                   fastify.log.warn(`No active game found for player ${player1_id}`);
               }
           }
-          
-          const winner_id = winner === 'player1' ? player1_id : (player2_id > 0 ? player2_id : null);
-          
-          fastify.log.info(`Saving game with player1_id=${player1_id}, player2_id=${player2_id}, winner_id=${winner_id}`);
-          
-          // Insert the game record
-          const result = await insertCompletedGameRecord(fastify, player1_id, player2_id, player1_score, player2_score, game_type, winner_id);
-          const gameId = result.lastID;
-          fastify.log.info(`Game saved with ID: ${gameId}`);
-          
-          // Get the inserted game
-          const game = await getGameById(fastify, gameId || -1);
-          
-          // Add to match history for player 1
-          await insertPlayerRecord(fastify, player1_id, gameId || -1, player2_id > 0 ? player2_id : null, winner === 'player1' ? 'win' : 'loss');
-          
-          fastify.log.info(`Match history added for player1`);
-          
-          // If player2 is a real user (not AI), add to their history too
-          if (player2_id > 0) {
-              await insertPlayerRecord(fastify, player2_id, gameId || -1, player1_id, winner === 'player2' ? 'win' : 'loss');
-              fastify.log.info(`Match history added for player2`);
+
+          if (game_type === 'multi' && tournamentMatchId)
+          {
+            const tournament_match = await getTournamentMatch(fastify, tournamentMatchId);
+            if (!tournament_match) {
+                fastify.log.error(`Tournament Match ${tournamentMatchId} not found when processing results.`);
+                return reply.code(404).send({ error: "Tournament Match not found" });
+            }
+            
+            if (tournament_match.winner_id !== null)
+            {
+                fastify.log.info(`cannot save match, already has a winner for this match`);
+                reply.code(400).send({ error: 'Already has a winner for this match'});
+                return;
+            }
+
+            let winner_id: number;
+            if (player1_score > player2_score)
+                winner_id = tournament_match.player1_id;
+            else
+                winner_id = tournament_match.player2_id;
+            const loserId = (winner_id === tournament_match.player1_id) ? tournament_match.player2_id : tournament_match.player1_id;
+            fastify.log.info(`Tournament Match ${tournamentMatchId} finished. Winner: ${winner_id}, Loser: ${loserId}`);
+
+            const gameResult = await insertCompletedGameRecord(fastify, tournament_match.player1_id, tournament_match.player2_id, player1_score, player2_score, 'tournament', winner_id);
+            const gameId = gameResult.lastID;
+            fastify.log.info(`Tournament game record created with ID: ${gameId}`);
+            const tournament = await getTournament(fastify, tournament_match.tournament_id);
+            const tournamentName = (tournament && tournament.length > 0) ? tournament[0].name : 'Tournament Match';
+            if (gameId)
+            {
+                await insertPlayerRecord(fastify, winner_id, gameId, loserId, 'win', tournamentName);
+                await insertPlayerRecord(fastify, loserId, gameId, winner_id, 'loss', tournamentName);
+                fastify.log.info(`Match history added for tournament match ${tournamentMatchId} using title: ${tournamentName}`);
+            }
+
+            await updateTournamentMatchResult(fastify, player1_score, player2_score, winner_id, tournamentMatchId);
+            fastify.log.info(`Updated tournament_matches table for match ${tournamentMatchId}.`);
+
+            await updatePlayerStats(fastify, winner_id, true);
+            await updatePlayerStats(fastify, loserId, false);
+            const tournament_matches = await getTournamentNextRoundMatches(fastify, (tournament_match.round + 1), tournament_match.tournament_id);
+            if (tournament_matches.length > 0)
+            {
+                for (const match of tournament_matches) 
+                {
+                    if (match.player1_id === -1)
+                    {
+                        updateNextRoundMatchPlayer(fastify, winner_id, match.player2_id, match.id);
+                        break;
+                    }
+                    if (match.player2_id === -1)
+                    {
+                        updateNextRoundMatchPlayer(fastify, match.player1_id, winner_id, match.id);
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                await updateTournamentWinner(fastify, winner_id, tournament_match.tournament_id);
+                await updateTournamentStatus(fastify, 'completed', tournament_match.tournament_id);
+            }
+            reply.code(200).send({ message: "Tournament match result processed." });
+            return;
           }
-          
-          // Update player stats
-          await updatePlayerStats(fastify, player1_id, winner_id === player1_id);
-          
-          if (player2_id > 0) {
-              await updatePlayerStats(fastify, player2_id, winner_id === player2_id);
-          }
-          
-          fastify.log.info(`Game results recorded: ${JSON.stringify(game)}`);
-          reply.code(201);
-          return game;
+          else
+          {
+            const winner_id = winner === 'player1' ? player1_id : (player2_id > 0 ? player2_id : null);
+            fastify.log.info(`Saving game with player1_id=${player1_id}, player2_id=${player2_id}, winner_id=${winner_id}`);
+            
+            const gameTypeForRecord = (tournamentMatchId) ? 'tournament' : game_type;
+            const result = await insertCompletedGameRecord(fastify, player1_id, player2_id, player1_score, player2_score, gameTypeForRecord, winner_id);
+            const gameId = result.lastID;
+            fastify.log.info(`Game saved with ID: ${gameId}`);
+            
+            const game = await getGameById(fastify, gameId || -1);
+            await insertPlayerRecord(fastify, player1_id, gameId || -1, player2_id > 0 ? player2_id : null, winner === 'player1' ? 'win' : 'loss', game_title || null);
+            fastify.log.info(`Match history added for player1`);
+            if (player2_id > 0)
+            {
+                await insertPlayerRecord(fastify, player2_id, gameId || -1, player1_id, winner === 'player2' ? 'win' : 'loss', game_title || null);
+                fastify.log.info(`Match history added for player2`);
+            }
+            await updatePlayerStats(fastify, player1_id, winner_id === player1_id);
+            if (player2_id > 0)
+                await updatePlayerStats(fastify, player2_id, winner_id === player2_id);
+            fastify.log.info(`Game results recorded: ${JSON.stringify(game)}`);
+            reply.code(201);
+            return game;
+        }
       } catch (err : unknown) {
         if (err instanceof Error){
           fastify.log.error(`Error saving game results: ${err.message}`);

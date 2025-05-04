@@ -15,7 +15,6 @@ export default class BadRequestError extends CustomError {
     this._logging = logging ?? false;
     this._context = params?.context ?? {};
 
-    // Only because we are extending a built in class
     Object.setPrototypeOf(this, BadRequestError.prototype);
   }
 

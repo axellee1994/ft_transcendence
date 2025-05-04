@@ -1,12 +1,17 @@
 class SQLStatement {
 
+  // plugin for checking online status
+  static readonly PLUGIN_CHECK_ONLINE = "UPDATE users SET is_online = 0 WHERE is_online = 1 AND datetime(last_seen) < datetime('now', '-5 minutes');";
+
   // user Management
-  static readonly USER_GET_ALL = 'SELECT id, username, display_name, email, avatar_url, is_online, last_seen, created_at FROM users ORDER BY created_at DESC;';
+  static readonly USER_GET_ALL = 'SELECT * FROM users ORDER BY created_at DESC;';
   static readonly USER_GET_ID = 'SELECT id FROM users WHERE username = ? OR email = ?;';
   static readonly USER_CREATE_USER = 
   `INSERT INTO users (username, email, password_hash, display_name, avatar_url, is_online, last_seen, created_at, updated_at)
    VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`;
-  static readonly USER_GET_CREATED_INFO = 'SELECT id, username, email, created_at, last_seen, is_online, display_name FROM users WHERE id = ?;';
+  static readonly USER_GET_CREATED_INFO = 'SELECT id, username, email, created_at, last_seen, is_online, display_name, is_2fa_enabled, is_remote_user FROM users WHERE id = ?;';
+  static readonly USER_SET_IS_REMOTE_USER = 'UPDATE users SET is_remote_user = 1 WHERE id = ?;';
+  
   static readonly USER_GET_INFO = 'SELECT * FROM users WHERE username = ?;';
   static readonly USER_SET_ONLINE_STATUS = 'UPDATE users SET is_online = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?;';
   static readonly USER_SEARCH = 
@@ -24,6 +29,8 @@ class SQLStatement {
         END as direction
      FROM friendships 
      WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?);`;
+  static readonly USER_GET_ONLINE_STATUS = 'SELECT id, username, is_online, last_seen FROM users WHERE id = ?;';
+  static readonly USER_ONLINE_STATUS_BY_USERNAME_OR_DISPLAYNAME = "SELECT id, username, display_name, avatar_url, is_online, last_seen FROM users WHERE username LIKE ? OR display_name LIKE ? ORDER BY username ASC LIMIT 10;";
 
   // auth
   static readonly USER_GET_BY_ID = 'SELECT * FROM users WHERE id = ?;';
@@ -65,6 +72,15 @@ class SQLStatement {
   static readonly FRIENDSHIP_ACCEPT_FRIEND = "UPDATE friendships SET status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE id = ?;";
   static readonly FRIENDSHIP_DELETE_BY_ID = "DELETE FROM friendships WHERE id = ?;";
   static readonly FRIENDSHIP_UNFRIEND = "DELETE FROM friendships WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?);";
+  static readonly FRIENDSHIP_GET_FRIEND_STATUS_BY_USERID_OR_FRIENDID = 
+  `SELECT 
+    status,
+    CASE 
+        WHEN user_id = ? THEN 'outgoing'
+        WHEN friend_id = ? THEN 'incoming'
+    END as direction
+    FROM friendships 
+    WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?);`;
 
   // game
   static readonly GAME_GET_GAMES = "SELECT * FROM games ORDER BY created_at DESC;";
@@ -83,10 +99,11 @@ class SQLStatement {
     `INSERT INTO games
     (player1_id, player2_id, player1_score, player2_score, game_type, winner_id, status, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`;
-  static readonly GAME_INSERT_PLAYER_RECORD = "INSERT INTO match_history (user_id, game_id, opponent_id, result) VALUES (?, ?, ?, ?);";
+  static readonly GAME_INSERT_PLAYER_RECORD = "INSERT INTO match_history (user_id, game_id, opponent_id, result, game_title) VALUES (?, ?, ?, ?, ?);";
   static readonly GAME_PLAYED_WON_BY_ID = "SELECT games_played, games_won FROM user_stats WHERE user_id = ?;";
   static readonly GAME_UPDATE_USER_STAT = "UPDATE user_stats SET games_played = games_played + 1, games_won = games_won + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?;";
   static readonly GAME_CREATE_USER_STAT = "INSERT INTO user_stats (user_id, games_played, games_won, created_at, updated_at) VALUES (?, 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);";
+  static readonly GAME_GET_GAME_HIST_USERID = "SELECT * FROM games WHERE player1_id = ? OR player2_id = ? ORDER BY created_at DESC LIMIT 10;";
 
   // match-history
   static readonly USER_GET_MATCH_HISTORY = 
@@ -105,11 +122,38 @@ class SQLStatement {
      ORDER BY g.created_at DESC 
      LIMIT 10;`;
 
+  static readonly HISTORY_MATCH_FILTER = 
+    `SELECT 
+      mh.id,
+      mh.result,
+      mh.created_at as match_date,
+      mh.game_title,
+      g.player1_score,
+      g.player2_score,
+      g.game_type,
+      CASE 
+          WHEN mh.opponent_id IS NULL THEN 'AI'
+          ELSE u.username 
+      END as opponent_username,
+      CASE 
+          WHEN mh.opponent_id IS NULL THEN 'AI'
+          ELSE u.display_name 
+      END as opponent_display_name,
+      CASE 
+          WHEN mh.opponent_id IS NULL THEN '/assets/images/ai-avatar.png'
+          ELSE u.avatar_url 
+      END as opponent_avatar
+    FROM match_history mh
+    JOIN games g ON mh.game_id = g.id
+    LEFT JOIN users u ON mh.opponent_id = u.id
+    WHERE mh.user_id = ?`;
+
   static readonly HISTORY_MATCH_BY_ID = 
   `SELECT 
     mh.id,
     mh.result,
     mh.created_at as match_date,
+    mh.game_title,
     g.player1_score,
     g.player2_score,
     g.game_type,
@@ -149,6 +193,7 @@ class SQLStatement {
       SUM(CASE WHEN result = 'draw' THEN 1 ELSE 0 END) as draws,
       SUM(CASE WHEN g.game_type = 'single' THEN 1 ELSE 0 END) as single_player_matches,
       SUM(CASE WHEN g.game_type = 'multi' THEN 1 ELSE 0 END) as multiplayer_matches,
+      SUM(CASE WHEN g.game_type = 'tournament' THEN 1 ELSE 0 END) as tournament_matches,
       SUM(CASE WHEN mh.opponent_id IS NULL THEN 1 ELSE 0 END) as vs_ai_matches,
       SUM(CASE WHEN mh.opponent_id IS NOT NULL THEN 1 ELSE 0 END) as vs_player_matches
   FROM match_history mh
@@ -170,10 +215,10 @@ class SQLStatement {
     WHERE user_id = ?;`;
 
   // tournaments
-  static readonly TOURNA_GET_ALL_TOURNA = "SELECT * FROM tournaments ORDER BY created_at DESC;";
-  static readonly TOURNA_GET_TOURNA_BY_ID = "SELECT * FROM tournaments WHERE id = ?;";
-  static readonly TOURNA_GET_PLAYER_IN_TOURNA_BY_ID = "SELECT u.id, u.username, u.display_name, tp.status FROM tournament_participants tp JOIN users u ON tp.user_id = u.id WHERE tp.tournament_id = ?;";
-  static readonly TOURNA_GET_ALL_GAME_WITH_PLAYER = 
+  static readonly TMT_GET_ALL_TOURNA = "SELECT * FROM tournaments ORDER BY created_at DESC;";
+  static readonly TMT_GET_TOURNA_BY_ID = "SELECT * FROM tournaments WHERE id = ?;";
+  static readonly TMT_GET_PLAYER_IN_TOURNA_BY_ID = "SELECT u.id, u.username, u.display_name, tp.status FROM tournament_participants tp JOIN users u ON tp.user_id = u.id WHERE tp.tournament_id = ?;";
+  static readonly TMT_GET_ALL_GAME_WITH_PLAYER = 
   `SELECT 
     g.id,
     g.player1_id,
@@ -191,29 +236,53 @@ class SQLStatement {
   LEFT JOIN users p2 ON tm.player2_id = p2.id
   WHERE tm.tournament_id = ?
   ORDER BY tm.round, tm.match_order;`;
-  static readonly TOURNA_INSERT_TOURNA = "INSERT INTO tournaments (name, description, start_date, end_date, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);";
-  static readonly TOURNA_UPDATE_TOURNA = "UPDATE tournaments SET name = ?, description = ?, start_date = ?, end_date = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;";
+  static readonly TOURNA_INSERT_TOURNA = "INSERT INTO tournaments (name, description, start_date, end_date, status, max_players, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);";
+  
+  static readonly TMT_UPDATE_TOURNA = "UPDATE tournaments SET name = ?, description = ?, start_date = ?, end_date = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;";
 
-  static readonly TOURNA_GET_PLAYER_FROM_PARTICIPANT = "SELECT user_id FROM tournament_participants WHERE tournament_id = ? AND user_id = ?;";
-  static readonly TOURNA_INSERT_PLAYER_FROM_PARTICIPANT = "INSERT INTO tournament_participants (tournament_id, user_id, status) VALUES (?, ?, ?);";
-  static readonly TOURNA_DELETE_PLAYER_FROM_PARTICIPANT = "DELETE FROM tournament_participants WHERE tournament_id = ? AND user_id = ?;";
-  static readonly TOURNA_GET_PARTICIPANT_BY_ID = "SELECT * FROM tournament_participants WHERE tournament_id = ? AND user_id = ?;"; 
-  static readonly TOURNA_INSERT_PARTICIPANT_INTO_TOURNA = "INSERT INTO tournament_participants (tournament_id, user_id, status, created_at, updated_at) VALUES (?, ?, 'registered', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);";
-  static readonly TOURNA_GET_TOURNA_PARTICIPANT = "SELECT * FROM tournament_participants WHERE id = ?;";
-  static readonly TOURNA_GET_ALL_PLAYERS_IN_TOURNA = "SELECT u.id, u.username, u.display_name, u.avatar_url, tp.status FROM tournament_participants tp JOIN users u ON tp.user_id = u.id WHERE tp.tournament_id = ? ORDER BY tp.created_at ASC;";
+  static readonly TMT_GET_PLAYER_FROM_PARTICIPANT = "SELECT user_id FROM tournament_participants WHERE tournament_id = ? AND user_id = ?;";
+  static readonly TMT_INSERT_PLAYER_FROM_PARTICIPANT = "INSERT INTO tournament_participants (tournament_id, user_id, status) VALUES (?, ?, ?);";
+  static readonly TMT_DELETE_PLAYER_FROM_PARTICIPANT = "DELETE FROM tournament_participants WHERE tournament_id = ? AND user_id = ?;";
+  static readonly TMT_GET_PARTICIPANT_BY_ID = "SELECT * FROM tournament_participants WHERE tournament_id = ? AND user_id = ?;"; 
+  static readonly TMT_INSERT_PARTICIPANT_INTO_TOURNA = "INSERT INTO tournament_participants (tournament_id, user_id, status, created_at, updated_at) VALUES (?, ?, 'registered', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);";
+  static readonly TMT_GET_TOURNA_PARTICIPANT = "SELECT * FROM tournament_participants WHERE id = ?;";
+  static readonly TMT_GET_ALL_PLAYERS_IN_TOURNA = "SELECT u.id, u.username, u.display_name, u.avatar_url, tp.status FROM tournament_participants tp JOIN users u ON tp.user_id = u.id WHERE tp.tournament_id = ? ORDER BY tp.created_at ASC;";
 
-  static readonly SQLSAMPLEDATA = 
-  `DELETE FROM users;
-  INSERT INTO users (id, username, email, password_hash, display_name, avatar_url, is_online, last_seen, twofa_secret)
-  VALUES (-1, "string1", "string2", "string3@yahoo.com.sg", "string", "string", "String", "String", "String")`
+  static readonly TOURNA_INSERT_TOURNA_MATCH = "INSERT INTO tournament_matches (tournament_id, player1_id, player2_id, round, match_order, created_at, updated_at) VALUES(?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);";
+  static readonly TOURNA_UPDATE_TOURNA_STATUS = "UPDATE tournaments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;";
+  static readonly TOURNA_GET_ALL_MATCHES = "SELECT * FROM tournament_matches WHERE tournament_id = ?;";
+  static readonly TOURNA_UPDATE_MATCH_RESULT = "UPDATE tournament_matches SET player1_score = ?, player2_score = ?, winner_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;";
+  static readonly TOURNA_GET_MATCH = "SELECT * FROM tournament_matches WHERE id = ?;";
+  static readonly TOURNA_NEXT_ROUND_MATCHES = "SELECT * FROM tournament_matches WHERE round = ? AND tournament_id = ? ORDER BY match_order ASC;";
+  static readonly TOURNA_UPDATE_NEXT_ROUND_PLAYER = "UPDATE tournament_matches SET player1_id = ?, player2_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;";
+  static readonly TOURNA_UPDATE_TOURNA_WINNER = "UPDATE tournaments SET winner_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;";
+  static readonly TOURNA_GET_NAME_COUNT = 'SELECT COUNT(*) as count FROM tournaments WHERE name = ?;';
+
+  // user setting
+  static readonly USERSETTING_SET_USERNAME = "UPDATE users SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;";
+  static readonly USERSETTING_SET_DISPLAYNAME = 'UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;';
+  static readonly USERSETTING_SET_EMAIL = "UPDATE users SET email = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;";
+  static readonly USERSETTING_SET_AVATAR = 'UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;';
+  static readonly USERSETTING_SET_PW_HASH = 'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;';
+  
+  static readonly USERSETTING_GET_DISPLAYNAME_COUNT = 'SELECT COUNT(*) as count FROM users WHERE display_name = ? AND id <> ?;';
+  static readonly USERSETTING_GET_USERNAME_COUNT = 'SELECT COUNT(*) as count FROM users WHERE username = ? AND id <> ?;';
+  static readonly USERSETTING_GET_EMAIL_COUNT = 'SELECT COUNT(*) as count FROM users WHERE email = ? AND id <> ?;';
+  
+
+  // twofas
+  static readonly USER_DELETE_TWOFAS = 'DELETE FROM twofas WHERE user_id = ?;';
+  static readonly USER_INSERT_TWOFAS = 'INSERT INTO twofas (code, user_id, created_at) VALUES (?, ?, CURRENT_TIMESTAMP);';
+  static readonly USER_GET_TWOFAS = 'SELECT code FROM twofas WHERE user_id = ? AND expired_at > CURRENT_TIMESTAMP;';
+  static readonly USERSETTING_SET_TWOFAS = 'UPDATE users SET is_2fa_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;';
 
   static readonly SQLSCHEMA = `
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      email TEXT UNIQUE,
+      username TEXT UNIQUE NOT NULL COLLATE NOCASE,
+      email TEXT UNIQUE COLLATE NOCASE,
       password_hash TEXT NOT NULL,
-      display_name TEXT,
+      display_name TEXT COLLATE NOCASE,
       avatar_url TEXT,
       is_online BOOLEAN DEFAULT 0,
       last_seen TIMESTAMP,
@@ -222,7 +291,7 @@ class SQLStatement {
       wins INTEGER DEFAULT 0,
       losses INTEGER DEFAULT 0,
       is_2fa_enabled BOOLEAN DEFAULT 0,
-      twofa_secret TEXT
+      is_remote_user BOOLEAN DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS games (
@@ -249,6 +318,7 @@ class SQLStatement {
       result TEXT NOT NULL CHECK(result IN ('win', 'loss', 'draw')),
       score TEXT,
       game_type TEXT,
+      game_title TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (game_id) REFERENCES games(id),
@@ -282,12 +352,13 @@ class SQLStatement {
 
     CREATE TABLE IF NOT EXISTS tournaments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
+      name TEXT NOT NULL COLLATE NOCASE,
       description TEXT,
       start_date TIMESTAMP NOT NULL,
       end_date TIMESTAMP NOT NULL,
-      status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'active', 'completed')),
+      status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'active', 'completed', 'full')),
       winner_id INTEGER,
+      max_players INTEGER,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (winner_id) REFERENCES users(id)
@@ -305,11 +376,22 @@ class SQLStatement {
       UNIQUE(tournament_id, user_id)
     );
 
-    CREATE TABLE IF NOT EXISTS tournament_matches (
+    CREATE TABLE IF NOT EXISTS twofas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      expired_at TIMESTAMP DEFAULT (datetime('now', '+5 minutes')),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+      CREATE TABLE IF NOT EXISTS tournament_matches (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       tournament_id INTEGER NOT NULL,
       player1_id INTEGER NOT NULL,
       player2_id INTEGER NOT NULL,
+      player1_score INTEGER DEFAULT 0,
+      player2_score INTEGER DEFAULT 0,
       winner_id INTEGER,
       game_id INTEGER,
       round INTEGER NOT NULL,
@@ -322,6 +404,8 @@ class SQLStatement {
       FOREIGN KEY (winner_id) REFERENCES users(id),
       FOREIGN KEY (game_id) REFERENCES games(id)
     );
+
+
   `
 
 }

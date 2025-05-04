@@ -1,40 +1,26 @@
 import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
+import ConstantsPong from '../ConstantsPong';
+import SQLStatement from '../SQLStatement';
 
 export interface UserStatusPluginOptions {
-    // Specify Support plugin options here
 
 }
 
-
 const userStatusPlugin:FastifyPluginAsync = async(fastify, options) => {
-    // Set users offline after 5 minutes of inactivity
-    // const ONLINE_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
     
-    // Check and update user status every minute
     const statusInterval = setInterval(async () => {
         try {
-            // Find users who haven't been active in the last 5 minutes and set them offline
-            await fastify.db.run(`
-                UPDATE users 
-                SET is_online = 0 
-                WHERE is_online = 1 AND datetime(last_seen) < datetime('now', '-5 minutes')
-            `);
+            await fastify.db.run(SQLStatement.PLUGIN_CHECK_ONLINE);
         } catch (err) {
             fastify.log.error('Error updating user status:', err);
         }
-    }, 60000); // Check every minute
+    }, ConstantsPong.ONLINE_TIMEOUT);
     
-    // Clean up interval on Fastify close
     fastify.addHook('onClose', () => {
         clearInterval(statusInterval);
     });
 }
-
-// export const userStatus = fp(userStatusPlugin, {
-//     name: 'userStatus',
-//     dependencies: ['db']
-// }); 
 
 export default fp<UserStatusPluginOptions>(userStatusPlugin,{
     name: 'userStatus',

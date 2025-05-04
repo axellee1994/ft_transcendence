@@ -84,7 +84,6 @@ export class UserProfile {
             </div>
         `;
 
-        // Initialize avatar upload
         const avatarContainer = this.container.querySelector('#avatar-container');
         if (avatarContainer) {
             this.avatarUpload = new AvatarUpload({
@@ -94,7 +93,6 @@ export class UserProfile {
             });
         }
 
-        // Add event listeners
         if (this.isEditing) {
             const form = this.container.querySelector('form');
             if (form) {
