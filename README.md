@@ -70,4 +70,4 @@ For questions or support, please contact:
 
 ---
 
-*Thank you for checking out 42 Transcendence! Contributions, feedback, and issues are always welcome.*
+Thank you for using and contributing to **ft_transcendence**! If you find this project helpful, please consider starring the repository or submitting improvements.
