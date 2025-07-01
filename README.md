@@ -50,7 +50,7 @@ npm run start
 By default, frontend runs on http://localhost:4000
 
 ## Usage Instructions
-- Access the application at [http://localhost:4001](http://localhost:4001) when using Docker Compose.
+- Access the application at [http://localhost:3000](http://localhost:3000) when using Docker Compose.
 - Register or log in to start playing Pong, chat with friends, and explore user profiles.
 - Use the navigation bar to switch between game, chat, and profile sections.
 
