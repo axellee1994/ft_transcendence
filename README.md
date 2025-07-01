@@ -30,7 +30,7 @@ git clone https://github.com/axellee1994/ft_transcendence.git
 cd ft_transcendence
 docker-compose up --build
 ```
-This will build and start the backend container. The backend API will be available on port 3000.
+This will build and start the complete application (both frontend and backend). The full application will be available at `http://localhost:3000`.
 
 ### Manual Setup (Development)
 #### Backend
@@ -50,9 +50,17 @@ npm run start
 By default, frontend runs on http://localhost:4000
 
 ## Usage Instructions
-- When running with Docker Compose, the backend API will be available at `http://localhost:3000`.
-- For a full application experience, you must run the frontend separately using the manual setup instructions.
-- Once both are running, access the frontend at `http://localhost:4000`.
+
+### Docker Compose (Complete Application)
+- When running with Docker Compose, the complete application (frontend + backend) will be available at `http://localhost:3000`.
+- Simply navigate to `http://localhost:3000` to access the full application.
+
+### Manual Setup (Development Mode)
+- When running manually, the backend API will be available at `http://localhost:3000`.
+- The frontend development server will be available at `http://localhost:4000`.
+- For development, access the frontend at `http://localhost:4000` which will communicate with the backend API.
+
+### Getting Started
 - Register or log in to start playing Pong, chat with friends, and explore user profiles.
 - Use the navigation bar to switch between game, chat, and profile sections.
 
