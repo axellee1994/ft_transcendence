@@ -1,0 +1,39 @@
+{
+  "name": "transcendence-frontend",
+  "version": "1.0.0",
+  "description": "42 Transcendence Frontend",
+  "main": "index.js",
+  "scripts": {
+    "start": "webpack serve --mode development --open",
+    "dev": "webpack --mode development && serve -s dist -p 4000",
+    "prebuild" : "mkdir -m 777 -p ../backend/dist/public/ && rm -rf ../backend/dist/public/*",
+    "build": "webpack --mode production",
+    "postbuild" : "cp ./dist/* ../backend/dist/public/",
+    "test": "jest"
+  },
+  "dependencies": {
+    "babylonjs": "^7.49.0",
+    "babylonjs-gui": "^7.49.0",
+    "babylonjs-loaders": "^7.50.0"
+  },
+  "devDependencies": {
+    "@types/babylonjs": "^2.4.1",
+    "@types/node": "^20.0.0",
+    "autoprefixer": "^10.4.0",
+    "css-loader": "^6.8.0",
+    "html-webpack-plugin": "^5.5.0",
+    "postcss": "^8.4.0",
+    "postcss-loader": "^7.3.0",
+    "style-loader": "^3.3.0",
+    "tailwindcss": "^3.3.0",
+    "ts-loader": "^9.4.0",
+    "typescript": "^5.0.0",
+    "webpack": "^5.88.0",
+    "webpack-cli": "^5.1.0",
+    "webpack-dev-server": "^4.15.0"
+  },
+  "browserslist": [
+    "last 2 Firefox versions",
+    "last 2 Chrome versions"
+  ]
+}
