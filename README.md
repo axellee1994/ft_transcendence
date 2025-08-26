@@ -28,7 +28,7 @@
 ```bash
 git clone https://github.com/axellee1994/ft_transcendence.git
 cd ft_transcendence
-docker-compose up --build
+docker compose up --build
 ```
 This will build and start the complete application (both frontend and backend). The full application will be available at `http://localhost:3000`.
 
